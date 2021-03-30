@@ -6,8 +6,9 @@ from pyrddl.expr import Expression
 
 from psychsim.agent import Agent
 from psychsim.world import World
-from psychsim_rddl.rddl import _parse_rddl
 from psychsim.pwl import KeyedVector, CONSTANT, rewardKey, makeTree, makeFuture, KeyedMatrix
+
+from rddl2psychsim.rddl import parse_rddl
 
 __author__ = 'Pedro Sequeira'
 __email__ = 'pedrodbs@gmail.com'
@@ -24,7 +25,7 @@ class Converter(object):
 
     def convert(self, rddl_file: str, agent_name='Agent', verbose=True) -> None:
         # parse RDDL file
-        self.model = _parse_rddl(rddl_file, verbose)
+        self.model = parse_rddl(rddl_file, verbose)
         domain = self.model.domain
 
         # create world and agent #TODO read agent(s) name(s) from RDDL?
@@ -97,7 +98,7 @@ class Converter(object):
         e_type = expression.etype[0]
         if e_type == 'constant':
             try:
-                return float(expression.args)
+                return {CONSTANT: float(expression.args)}
             except ValueError:
                 logging.info(f'Could not convert value "{expression.args}" to float in RDDL expression "{expression}"')
 
@@ -109,14 +110,14 @@ class Converter(object):
                 try:
                     value = self._get_constant_value(name)
                     return {CONSTANT: float(value)}
-                except ValueError as e:
+                except ValueError:
                     logging.info(f'Could not convert value "{value}" to float in RDDL expression "{expression}"')
             raise ValueError(f'Could not find feature or constant from RDDL expression "{expression}"')
 
         # process arithmetic node
         if e_type == 'arithmetic':
             def _get_const_val(s):
-                return s if isinstance(s, float) else s[CONSTANT] if (len(s) == 1 and CONSTANT in s) else None
+                return s if isinstance(s, float) else s[CONSTANT] if len(s) == 1 and CONSTANT in s else None
 
             def _update_weights(s):
                 for k, v in s.items():

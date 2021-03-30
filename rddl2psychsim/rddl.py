@@ -5,7 +5,7 @@ __author__ = 'Pedro Sequeira'
 __email__ = 'pedrodbs@gmail.com'
 
 
-def _parse_rddl(rddl_file: str, verbose: bool) -> RDDL:
+def parse_rddl(rddl_file: str, verbose: bool) -> RDDL:
     # read RDDL file
     with open(rddl_file, 'r') as file:
         rddl = file.read()
