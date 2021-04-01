@@ -4,8 +4,8 @@ __author__ = 'Pedro Sequeira'
 __email__ = 'pedrodbs@gmail.com'
 
 setup(name='rddl2psychsim',
-      version='1.0',
-      description='Framework for converting RDDL domains into PsychSim.',
+      version='0.1',
+      description='Python framework for converting RDDL domains into PsychSim.',
       author='Pedro Sequeira',
       author_email='pedrodbs@gmail.com',
       url='https://github.com/usc-psychsim/rddl2psychsim',
