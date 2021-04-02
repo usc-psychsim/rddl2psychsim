@@ -16,8 +16,10 @@ class Converter(_ConverterPWLBase):
         self.model = parse_rddl(rddl_file, verbose)
 
         logging.info('==================================================')
-        logging.info(f'Converting RDDL domain "{self.model.domain.name}" to PsychSim...')
+        logging.info(f'Converting RDDL domain "{self.model.domain.name}" '
+                     f'using instance "{self.model.instance.name}" to PsychSim...')
 
+        # TODO maybe read agent(s) names from rddl file? How would we separate stuff? how about models?
         agent = self._create_world_agents(agent_name)
 
         self._convert_constants()
@@ -25,6 +27,9 @@ class Converter(_ConverterPWLBase):
         self._convert_actions(agent)
         self._convert_reward_function(agent)
         self._convert_dynamics(agent)
+        self._initialize_variables()
 
         self.world.setOrder([{agent.name}])
+
+        logging.info('==================================================')
         logging.info('Done!')

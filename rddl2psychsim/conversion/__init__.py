@@ -1,4 +1,5 @@
 import logging
+from typing import List
 from pyrddl.rddl import RDDL
 from psychsim.agent import Agent
 from psychsim.world import World
@@ -15,6 +16,12 @@ class _ConverterBase(object):
         self.fluent_to_feature = {}
         self.constants = {}
         self.actions = {}
+
+    def log_state(self, features: List[str] = None):
+        for f in self.fluent_to_feature.values():
+            if features is None or f in features:
+                val = str(self.world.getFeature(f)).replace('\n', '\t')
+                logging.info(f'{f}: {val}')
 
     def _is_feature(self, sf: str) -> bool:
         # todo n-arity
@@ -43,8 +50,19 @@ class _ConverterBase(object):
         # create world and agent #TODO read agent(s) name(s) from RDDL?
         logging.info('__________________________________________________')
         self.world = World()
+
+        # create agent and set properties from instance
         agent = self.world.addAgent(agent_name)
-        logging.info(f'Created agent {agent.name}')
+        agent.setAttribute('horizon', self.model.instance.horizon)
+        agent.setAttribute('discount', self.model.instance.discount)
+
+        # TODO other world and agent attributes
+        agent.setAttribute('selection', 'random')
+
+        model = agent.get_true_model()
+        logging.info(f'Created agent {agent.name} with properties:')
+        logging.info(f'\thorizon: {agent.getAttribute("horizon", model)}')
+        logging.info(f'\tdiscount: {agent.getAttribute("discount", model)}')
         return agent
 
     def _convert_constants(self):
@@ -72,6 +90,7 @@ class _ConverterBase(object):
         logging.info('__________________________________________________')
         self.fluent_to_feature = {}
         for sf in self.model.domain.state_fluents.values():
+            # todo n-arity
             f_name = f'{sf.name}'
             f = self.world.defineState(agent.name, f_name, type(sf.default))
             self.world.setFeature(f, sf.default)
@@ -90,3 +109,16 @@ class _ConverterBase(object):
             logging.info(f'Created action "{action}" from action fluent: {act}')
 
         logging.info(f'Total {len(self.actions[agent.name])} actions created for agent "{agent.name}"')
+
+    def _initialize_variables(self):
+
+        # initialize variables from instance def
+        logging.info('__________________________________________________')
+        for sf, val in self.model.instance.init_state:
+            # todo n-arity
+            sf = sf[0]
+            if not self._is_feature(sf):
+                logging.info(f'Could not find feature corresponding to fluent "{sf}", skipping')
+            f = self._get_feature(sf)
+            self.world.setFeature(f, val)
+            logging.info(f'Initialized feature "{f}" with value "{val}"')
