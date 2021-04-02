@@ -32,4 +32,4 @@ class Converter(_ConverterPWLBase):
         self.world.setOrder([{agent.name}])
 
         logging.info('==================================================')
-        logging.info('Done!')
+        logging.info(f'Done processing {rddl_file}!')
