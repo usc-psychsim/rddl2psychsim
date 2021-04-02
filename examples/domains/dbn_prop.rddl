@@ -7,7 +7,7 @@ domain prop_dbn {
   	
 	requirements = { reward-deterministic };
       	
-	pvariables {
+	pvariables { 
 		p : { state-fluent,  bool, default = false };
 		q : { state-fluent,  bool, default = false };
 		r : { state-fluent,  bool, default = false }; 
@@ -35,13 +35,13 @@ non-fluents prop_dbn_empty {
         
 instance inst_dbn {
 
-	domain = prop_dbn;
-	init-state {
-		p = true;  // could also just say 'p' by itself
+	domain = prop_dbn;	
+	init-state { 
+		p = true;  // could also just say 'p' by itself 
 		q = false; // default so unnecessary, could also say '~q' by itself
 		r;         // same as r = true
 	};
-
+  
 	max-nondef-actions = 1;
 	horizon  = 20;
 	discount = 0.9;

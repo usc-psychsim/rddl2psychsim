@@ -8,7 +8,7 @@ __email__ = 'pedrodbs@gmail.com'
 __desc__ = 'Converts an RDDL file to PsychSim and runs a simulation for some timesteps.'
 
 MAX_STEPS = 50
-RDDL_FILE = 'examples/files/dbn_prop.rddl'
+RDDL_FILE = 'examples/domains/dbn_prop.rddl'
 
 if __name__ == '__main__':
 
@@ -24,7 +24,7 @@ if __name__ == '__main__':
     if not os.path.isfile(args.input):
         raise ValueError(f'Could not find RDDL file: {args.input}')
     conv = Converter()
-    conv.convert(args.input, verbose=False)
+    conv.convert(args.input, verbose=True)
 
     logging.info('')
     logging.info('==================================================')
