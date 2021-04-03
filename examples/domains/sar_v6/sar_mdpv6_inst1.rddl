@@ -1,0 +1,87 @@
+// same as v5 inst 1. Sanity check after adding the new fluents, but nothing in the env changed.
+non-fluents sar_mdpv6_1{
+	domain = sar_mdpv6; 
+	objects { 
+		player : {p1, p2};
+		victim : {v0, v1, v2};
+loc : {l0, l1, l2, l3, l4, l5, l6, l7, l8, l9, l10, l11, l12, l13, l14, l15, l16, l17, l18, l19, l20, l21, l22, l23, l24, l25, l26, l27};
+	}; 
+	non-fluents {
+conn(l0, l1) = @e;
+conn(l1, l0) = @w;
+conn(l1, l2) = @e;
+conn(l2, l1) = @w;
+conn(l2, l3) = @e;
+conn(l3, l2) = @w;
+conn(l3, l4) = @e;
+conn(l4, l3) = @w;
+conn(l4, l5) = @e;
+conn(l5, l4) = @w;
+conn(l5, l6) = @e;
+conn(l6, l5) = @w;
+conn(l6, l7) = @e;
+conn(l7, l6) = @w;
+conn(l7, l8) = @e;
+conn(l8, l7) = @w;
+conn(l8, l9) = @e;
+conn(l9, l8) = @w;
+conn(l9, l10) = @e;
+conn(l10, l9) = @w;
+conn(l10, l11) = @e;
+conn(l11, l10) = @w;
+conn(l11, l12) = @e;
+conn(l12, l11) = @w;
+conn(l12, l13) = @e;
+conn(l13, l12) = @w;
+conn(l13, l14) = @e;
+conn(l14, l13) = @w;
+conn(l14, l15) = @e;
+conn(l15, l14) = @w;
+conn(l15, l16) = @e;
+conn(l16, l15) = @w;
+conn(l16, l17) = @e;
+conn(l17, l16) = @w;
+conn(l18, l19) = @e;
+conn(l19, l18) = @w;
+conn(l20, l21) = @e;
+conn(l21, l20) = @w;
+conn(l21, l22) = @e;
+conn(l22, l21) = @w;
+conn(l23, l24) = @e;
+conn(l24, l23) = @w;
+conn(l24, l25) = @e;
+conn(l25, l24) = @w;
+conn(l25, l26) = @e;
+conn(l26, l25) = @w;
+conn(l26, l27) = @e;
+conn(l27, l26) = @w;
+conn(l8, l18) = @s;
+conn(l18, l8) = @n;
+conn(l17, l19) = @s;
+conn(l19, l17) = @n;
+conn(l20, l15) = @s;
+conn(l15, l20) = @n;
+conn(l19, l23) = @s;
+conn(l23, l19) = @n;		
+isRechargeLoc(l18) = true;
+isCritical(v0) = true;
+}; 
+ }
+instance sar_mdpv6_1 { 
+	domain = sar_mdpv6; 
+ 	non-fluents = sar_mdpv6_1;
+	init-state { 
+		pLoc(p1,l1) = true;
+		pLoc(p2,l1) = true;
+		vLoc(v0, l16) = true;
+		vLoc(v1, l22) = true;
+		vLoc(v2, l27) = true;
+		hasTool(p1, @medic) = true;
+		hasTool(p2, @medic) = true;
+		clear(l19, l17) = false;
+		vicState(v0) = @frozen;
+	};
+	max-nondef-actions = 2;
+	horizon = 20;
+	discount = 1.0;
+} 

@@ -1,0 +1,67 @@
+// Critical victim unfrozen by both players
+non-fluents sar_mdpv6_3{
+	domain = sar_mdpv6; 
+	objects { 
+		player : {p1, p2};
+		loc : {lc0, lc1, lc2, lc3, lc4, lc5, lc6, lc7, lc8, lc9, lc10, lc11, lc12, lc13, lc14, lc15, lc16, lc17};
+		victim : {v0, v1, v2};
+	}; 
+	non-fluents {
+isCritical(v2) = true;
+isThreatLoc(lc15) = true;
+conn(lc0, lc1) = @e;
+conn(lc1, lc0) = @w;
+conn(lc1, lc2) = @e;
+conn(lc2, lc1) = @w;
+conn(lc2, lc3) = @e;
+conn(lc3, lc2) = @w;
+conn(lc3, lc4) = @e;
+conn(lc4, lc3) = @w;
+conn(lc4, lc5) = @e;
+conn(lc5, lc4) = @w;
+conn(lc5, lc6) = @e;
+conn(lc6, lc5) = @w;
+conn(lc6, lc7) = @e;
+conn(lc7, lc6) = @w;
+conn(lc8, lc9) = @e;
+conn(lc9, lc8) = @w;
+conn(lc9, lc10) = @e;
+conn(lc10, lc9) = @w;
+conn(lc10, lc11) = @e;
+conn(lc11, lc10) = @w;
+conn(lc11, lc12) = @e;
+conn(lc12, lc11) = @w;
+conn(lc12, lc13) = @e;
+conn(lc13, lc12) = @w;
+conn(lc14, lc15) = @e;
+conn(lc15, lc14) = @w;
+conn(lc15, lc16) = @e;
+conn(lc16, lc15) = @w;
+conn(lc16, lc17) = @e;
+conn(lc17, lc16) = @w;
+conn(lc0, lc8) = @s;
+conn(lc8, lc0) = @n;
+conn(lc7, lc13) = @s;
+conn(lc13, lc7) = @n;
+conn(lc10, lc15) = @s;
+conn(lc15, lc10) = @n;
+}; 
+ }
+instance sar_mdpv6_3 { 
+	domain = sar_mdpv6; 
+ 	non-fluents = sar_mdpv6_3;
+	init-state { 
+		pLoc(p1,lc7) = true;
+		pLoc(p2,lc4) = true;
+		vLoc(v0, lc0) = true;
+		vLoc(v1, lc14) = true;
+		vLoc(v2, lc17) = true;
+		hasTool(p1, @medic) = true;
+		hasTool(p2, @medic) = true;
+		vicState(v2) = @frozen;
+                isActiveThreatLoc(lc15) = true;
+	};
+	max-nondef-actions = 2;
+	horizon = 17;
+	discount = 1.0;
+} 
