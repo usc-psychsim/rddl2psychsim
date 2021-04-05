@@ -1,6 +1,5 @@
 import logging
 from typing import List
-
 from pyrddl.pvariable import PVariable
 from pyrddl.rddl import RDDL
 from psychsim.agent import Agent

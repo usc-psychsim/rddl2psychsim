@@ -1,12 +1,12 @@
 import logging
-from rddl2psychsim.conversion.pwl import _ConverterPWLBase
+from rddl2psychsim.conversion.dynamics import _DynamicsConverter
 from rddl2psychsim.rddl import parse_rddl
 
 __author__ = 'Pedro Sequeira'
 __email__ = 'pedrodbs@gmail.com'
 
 
-class Converter(_ConverterPWLBase):
+class Converter(_DynamicsConverter):
 
     def __init__(self):
         super().__init__()
