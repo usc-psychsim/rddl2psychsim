@@ -58,7 +58,6 @@ class _ConverterPWLBase(_ConverterBase):
             # create stochastic effect
             return {'distribution': [(setToConstantMatrix(key, v), p) for v, p in tree_dict['distribution']]}
 
-        # KeyedPlane(KeyedVector({key: 1}), value, 0)
         raise NotImplementedError(f'Could not parse RDDL expression, got invalid tree: "{tree_dict}"!')
 
     def _get_expression_dict(self, expression: Expression, agent: Agent) -> Dict:
@@ -72,15 +71,22 @@ class _ConverterPWLBase(_ConverterBase):
                 logging.info(f'Could not convert value "{expression.args}" to float in RDDL expression "{expression}"!')
                 raise e
 
+        if e_type == 'penum':
+            # just check if enumerated type is known
+            name = expression.args
+            if self._is_enum_type(name):
+                return {name: 1.}
+            raise ValueError(f'Could not find enumerated type from RDDL expression "{expression}"!')
+
         if e_type == 'pvar':
             name = expression.args[0]
-            if self._is_feature(name):
+            if self._is_feature(name):  # feature
                 return {self._get_feature(name): 1.}
 
             if self._is_action(name, agent):
                 return {'action': self._get_action(name, agent)}
 
-            if self._is_constant(name):
+            if self._is_constant(name):  # named constant
                 try:
                     value = self._get_constant_value(name)
                     return {CONSTANT: float(value)}
