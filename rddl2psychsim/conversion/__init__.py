@@ -88,8 +88,10 @@ class _ConverterBase(object):
 
         # create agent and set properties from instance
         agent = self.world.addAgent(agent_name)
-        agent.setAttribute('horizon', self.model.instance.horizon)
-        agent.setAttribute('discount', self.model.instance.discount)
+        if hasattr(self.model.instance, 'horizon'):
+            agent.setAttribute('horizon', self.model.instance.horizon)
+        if hasattr(self.model.instance, 'discount'):
+            agent.setAttribute('discount', self.model.instance.discount)
 
         # TODO other world and agent attributes
         agent.setAttribute('selection', 'random')
@@ -129,7 +131,7 @@ class _ConverterBase(object):
         f = self.world.defineState(agent.name, f_name, *domain)
         self.fluent_to_feature[fluent.name] = f
 
-        # set to default value
+        # set to default value (if list assume first of list)
         lo = self.world.variables[f]['lo']
         def_val = fluent.default if fluent.default is not None else \
             lo if lo is not None else self.world.variables[f]['elements'][0]

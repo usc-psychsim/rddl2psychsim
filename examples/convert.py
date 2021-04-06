@@ -24,7 +24,7 @@ if __name__ == '__main__':
     if not os.path.isfile(args.input):
         raise ValueError(f'Could not find RDDL file: {args.input}')
     conv = Converter()
-    conv.convert(args.input, verbose=True)
+    conv.convert_file(args.input, verbose=True)
 
     logging.info('')
     logging.info('==================================================')
