@@ -46,7 +46,8 @@ class _DynamicsConverter(_ExpressionConverter):
 
         # just get the truth value of logical expressions
         if len(tree_dict) == 1 and next(iter(tree_dict.keys())) in \
-                {'pwl_and', 'logic_and', 'pwl_or', 'logic_or', 'not', 'equiv', 'imply', 'equal', 'diff'}:
+                {'pwl_and', 'logic_and', 'pwl_or', 'logic_or', 'not', 'equiv', 'imply',
+                 'eq', 'neq', 'gt', 'lt', 'geq', 'leq'}:
             return self._get_dynamics_tree(key, nested_if(tree_dict, {CONSTANT: True}, {CONSTANT: False}))
 
         if 'if' in tree_dict and len(tree_dict) == 3:

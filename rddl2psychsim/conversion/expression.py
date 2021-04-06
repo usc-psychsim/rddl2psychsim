@@ -9,6 +9,12 @@ __author__ = 'Pedro Sequeira'
 __email__ = 'pedrodbs@gmail.com'
 
 
+def is_pwl_op(o) -> bool:
+    return isinstance(o, dict) and \
+           all(isinstance(k, str) for k in o.keys()) and \
+           all(type(v) in {float, int, bool, str} for v in o.values())
+
+
 def nested_if(c, tb, fb, expression: Expression = None, agent: Agent = None) -> Dict:
     if 'pwl_and' in c and len(c) == 1:
         c = c['pwl_and']
@@ -39,7 +45,8 @@ def nested_if(c, tb, fb, expression: Expression = None, agent: Agent = None) -> 
 
     if 'equiv' in c:
         lhs, rhs = c['equiv']
-        lhs.update({k: -v for k, v in rhs.items()})
+        lhs = dict(lhs)
+        _update_weights(lhs, _negate_weights(rhs))
         return {'if': (lhs, 0, 0),  # takes equality of pwl comb in vectors (difference==0)
                 True: tb,
                 False: fb}
@@ -53,18 +60,52 @@ def nested_if(c, tb, fb, expression: Expression = None, agent: Agent = None) -> 
                        False: fb},
                 False: tb}
 
-    if 'equal' in c:
-        lhs, rhs = c['equiv']
-        lhs.update({k: -v for k, v in rhs.items()})
+    if 'eq' in c:
+        lhs, rhs = c['eq']
+        lhs = dict(lhs)
+        _update_weights(lhs, _negate_weights(rhs))
         return {'if': (lhs, 0, 0),  # takes equality of pwl comb in vectors (difference==0)
                 True: tb,
                 False: fb}
 
-    if 'diff' in c:
-        lhs, rhs = c['equiv']
-        lhs.update({k: -v for k, v in rhs.items()})
+    if 'neq' in c:
+        lhs, rhs = c['neq']
+        lhs = dict(lhs)
+        _update_weights(lhs, _negate_weights(rhs))
         return {'if': (lhs, 0, 0),  # takes equality of pwl comb in vectors (difference==0)
-                True: fb,  # switch branches
+                True: fb,  # then switch branches
+                False: tb}
+
+    if 'gt' in c:
+        lhs, rhs = c['gt']
+        lhs = dict(lhs)
+        _update_weights(lhs, _negate_weights(rhs))
+        return {'if': (lhs, 0, 1),  # takes diff of pwl comb in vectors (difference>0)
+                True: tb,
+                False: fb}
+
+    if 'lt' in c:
+        lhs, rhs = c['lt']
+        lhs = dict(lhs)
+        _update_weights(lhs, _negate_weights(rhs))
+        return {'if': (lhs, 0, -1),  # takes diff of pwl comb in vectors (difference<0)
+                True: tb,
+                False: fb}
+
+    if 'geq' in c:
+        lhs, rhs = c['geq']
+        lhs = dict(lhs)
+        _update_weights(lhs, _negate_weights(rhs))
+        return {'if': (lhs, 0, -1),  # takes diff of pwl comb in vectors (difference<0)
+                True: fb,  # then switch branches
+                False: tb}
+
+    if 'leq' in c:
+        lhs, rhs = c['leq']
+        lhs = dict(lhs)
+        _update_weights(lhs, _negate_weights(rhs))
+        return {'if': (lhs, 0, 1),  # takes diff of pwl comb in vectors (difference>0)
+                True: fb,  # then switch branches
                 False: tb}
 
     if 'action' in c and len(c) == 1 and agent is not None:
@@ -77,18 +118,24 @@ def nested_if(c, tb, fb, expression: Expression = None, agent: Agent = None) -> 
                 True: tb,
                 False: fb}
 
-    raise ValueError(f'Could not parse RDDL expression "{expression}", '
-                     f'invalid nested PWL control in "{c}"!')
-
-
-def is_pwl_op(o) -> bool:
-    return isinstance(o, dict) and \
-           all(isinstance(k, str) for k in o.keys()) and \
-           all(type(v) in {float, int, bool} for v in o.values())
+    raise ValueError(f'Could not parse RDDL expression "{expression}", invalid nested PWL control in "{c}"!')
 
 
 def _get_const_val(s) -> float or None:
-    return s if isinstance(s, float) else s[CONSTANT] if len(s) == 1 and CONSTANT in s else None
+    return s if isinstance(s, float) else float(s[CONSTANT]) if len(s) == 1 and CONSTANT in s else None
+
+
+def _update_weights(old_weights, new_weights):
+    assert is_pwl_op(new_weights), f'Could not parse RDDL expression, invalid PWL operation in "{new_weights}"!'
+    for k, v in new_weights.items():
+        old_weights[k] = old_weights[k] + v if k in old_weights else v  # add weight if key already in dict
+        if old_weights[k] == 0:
+            del old_weights[k]  # remove if weight is 0
+
+
+def _negate_weights(weights):
+    assert is_pwl_op(weights), f'Could not parse RDDL expression, invalid PWL operation in "{weights}"!'
+    return {k: -v for k, v in weights.items()}  # just negate the weight
 
 
 class _ExpressionConverter(_ConverterBase):
@@ -102,7 +149,7 @@ class _ExpressionConverter(_ConverterBase):
         e_type = expression.etype[0]
         if e_type == 'constant':
             try:
-                return {CONSTANT: float(expression.args)}
+                return {CONSTANT: expression.args}
             except ValueError as e:
                 logging.info(f'Could not convert value "{expression.args}" to float in RDDL expression "{expression}"!')
                 raise e
@@ -152,12 +199,6 @@ class _ExpressionConverter(_ConverterBase):
 
     def _convert_arithmetic_expr(self, expression: Expression, agent: Agent) -> Dict:
 
-        def _update_weights(s):
-            for k, v in s.items():
-                assert isinstance(k, str) and isinstance(v, float), \
-                    f'Could not parse RDDL expression "{expression}", invalid nested PWL arithmetic in "{s}"!'
-                weights[k] = weights[k] + v if k in weights else v  # add weight if key already in dict
-
         lhs = self._get_expression_dict(expression.args[0], agent)
         rhs = self._get_expression_dict(expression.args[1], agent) if len(expression.args) > 1 else {}
         lhs_const = _get_const_val(lhs)
@@ -170,8 +211,8 @@ class _ExpressionConverter(_ConverterBase):
             if all_consts:
                 return {CONSTANT: lhs_const + rhs_const}  # reduce
             # if addition, just add everything from both sides
-            _update_weights(lhs)
-            _update_weights(rhs)
+            _update_weights(weights, lhs)
+            _update_weights(weights, rhs)
             return weights
 
         if a_type == '-':
@@ -181,8 +222,8 @@ class _ExpressionConverter(_ConverterBase):
             if len(rhs) == 0:
                 rhs = lhs  # just switch if we only have one argument
                 lhs = {}
-            _update_weights(lhs)
-            _update_weights({k: -v for k, v in rhs.items()})  # then multiply right-hand side by -1
+            _update_weights(weights, lhs)
+            _update_weights(weights, {k: -v for k, v in rhs.items()})  # then multiply right-hand side by -1
             return weights
 
         if a_type == '*':
@@ -207,17 +248,6 @@ class _ExpressionConverter(_ConverterBase):
 
     def _convert_boolean_expr(self, expression: Expression, agent: Agent) -> Dict:
 
-        def _update_weights(s):
-            for k, v in s.items():
-                assert isinstance(k, str) and isinstance(v, float), \
-                    f'Could not parse RDDL expression "{expression}", invalid nested PWL boolean in "{s}"!'
-                if v == 0:
-                    weights.clear()
-                    weights[CONSTANT] = 0.  # if a value of 0 is associated with feature, then False (0)
-                    return
-
-                weights[k] = 1. if v > 0 else -1.  # truncate weight to 1 / -1 to allow later comparisons / planes
-
         lhs = self._get_expression_dict(expression.args[0], agent)
         rhs = self._get_expression_dict(expression.args[1], agent) if len(expression.args) > 1 else {}
         lhs_const = _get_const_val(lhs)
@@ -241,8 +271,8 @@ class _ExpressionConverter(_ConverterBase):
             if 'pwl_and' in rhs and len(rhs) == 1:
                 rhs = rhs['pwl_and']
             if is_pwl_op(lhs) and is_pwl_op(rhs):
-                _update_weights(lhs)  # if both vectors, just add everything from both sides (thresh >= len)
-                _update_weights(rhs)
+                _update_weights(weights, lhs)  # if both vectors, just add everything from both sides (thresh >= len)
+                _update_weights(weights, rhs)
                 return {'pwl_and': weights}
             return {'logic_and': (orig_lhs, orig_rhs)}  # defer for later processing
 
@@ -261,8 +291,8 @@ class _ExpressionConverter(_ConverterBase):
             if 'pwl_or' in rhs and len(rhs) == 1:
                 rhs = rhs['pwl_or']
             if is_pwl_op(lhs) and is_pwl_op(rhs):
-                _update_weights(lhs)  # if both vectors, just add everything from both sides (thresh > 0)
-                _update_weights(rhs)
+                _update_weights(weights, lhs)  # if both vectors, just add everything from both sides (thresh > 0)
+                _update_weights(weights, rhs)
                 return {'pwl_or': weights}
             return {'logic_or': (orig_lhs, orig_rhs)}  # defer for later processing
 
@@ -311,16 +341,6 @@ class _ExpressionConverter(_ConverterBase):
         raise NotImplementedError(f'Cannot parse boolean expression: "{expression}" of type "{b_type}"!')
 
     def _convert_relational(self, expression: Expression, agent: Agent) -> Dict:
-        def _update_weights(s):
-            for k, v in s.items():
-                assert isinstance(k, str) and isinstance(v, float), \
-                    f'Could not parse RDDL expression "{expression}", invalid nested PWL boolean in "{s}"!'
-                if v == 0:
-                    weights.clear()
-                    weights[CONSTANT] = 0.  # if a value of 0 is associated with feature, then False (0)
-                    return
-
-                weights[k] = 1. if v > 0 else -1.  # truncate weight to 1 / -1 to allow later comparisons / planes
 
         lhs = self._get_expression_dict(expression.args[0], agent)
         rhs = self._get_expression_dict(expression.args[1], agent) if len(expression.args) > 1 else {}
@@ -328,29 +348,78 @@ class _ExpressionConverter(_ConverterBase):
         rhs_const = _get_const_val(rhs)
         all_consts = isinstance(lhs_const, float) and isinstance(rhs_const, float)
 
-        weights = {}
         b_type = expression.etype[1]
         if b_type == '==':
             # if EQUALS, sides have to be of equal value
             if all_consts:
-                return {CONSTANT: rhs_const == lhs_const}  # equal values
+                return {CONSTANT: lhs_const == rhs_const}
             if rhs == lhs:  # equal dicts
                 return {CONSTANT: True}
 
             # left and right have to be pwl
             assert is_pwl_op(lhs) and is_pwl_op(rhs), \
                 f'Could not parse relational expression "{expression}", invalid PWL equivalence composition!'
-            return {'equiv': (lhs, rhs)}  # defer for later processing
+            return {'eq': (lhs, rhs)}  # defer for later processing
 
         if b_type == '~=':
-            # if DIFFERENT, sides have to be of different value
+            # if NOT_EQUAL, sides have to be of different value
             if all_consts:
-                return {CONSTANT: rhs_const != lhs_const}  # diff consts
+                return {CONSTANT: lhs_const != rhs_const}
+            if rhs == lhs:  # equal dicts, so not different
+                return {CONSTANT: False}
 
             # left and right have to be pwl
             assert is_pwl_op(lhs) and is_pwl_op(rhs), \
                 f'Could not parse relational expression "{expression}", invalid PWL equivalence composition!'
-            return {'diff': (lhs, rhs)}  # defer for later processing
+            return {'neq': (lhs, rhs)}  # defer for later processing
+
+        if b_type == '>':
+            # if GREATER_THAN, left has to be of higher value than right
+            if all_consts:
+                return {CONSTANT: lhs_const > rhs_const}
+            if rhs == lhs:  # equal dicts, so not different
+                return {CONSTANT: False}
+
+            # left and right have to be pwl
+            assert is_pwl_op(lhs) and is_pwl_op(rhs), \
+                f'Could not parse relational expression "{expression}", invalid PWL equivalence composition!'
+            return {'gt': (lhs, rhs)}  # defer for later processing
+
+        if b_type == '<':
+            # if LESS_THAN, left has to be of lower value than right
+            if all_consts:
+                return {CONSTANT: lhs_const < rhs_const}
+            if rhs == lhs:  # equal dicts, so not different
+                return {CONSTANT: False}
+
+            # left and right have to be pwl
+            assert is_pwl_op(lhs) and is_pwl_op(rhs), \
+                f'Could not parse relational expression "{expression}", invalid PWL equivalence composition!'
+            return {'lt': (lhs, rhs)}  # defer for later processing
+
+        if b_type == '>=':
+            # if GREATER_OR_EQUAL, left has to be of equal or higher value than right
+            if all_consts:
+                return {CONSTANT: lhs_const >= rhs_const}
+            if rhs == lhs:  # equal dicts
+                return {CONSTANT: True}
+
+            # left and right have to be pwl
+            assert is_pwl_op(lhs) and is_pwl_op(rhs), \
+                f'Could not parse relational expression "{expression}", invalid PWL equivalence composition!'
+            return {'geq': (lhs, rhs)}  # defer for later processing
+
+        if b_type == '<=':
+            # if LESS_OR_EQUAL, left has to be of equal or lower value than right
+            if all_consts:
+                return {CONSTANT: lhs_const <= rhs_const}
+            if rhs == lhs:  # equal dicts
+                return {CONSTANT: True}
+
+            # left and right have to be pwl
+            assert is_pwl_op(lhs) and is_pwl_op(rhs), \
+                f'Could not parse relational expression "{expression}", invalid PWL equivalence composition!'
+            return {'leq': (lhs, rhs)}  # defer for later processing
 
         raise NotImplementedError(f'Cannot parse relational expression: "{expression}" of type "{b_type}"!')
 
