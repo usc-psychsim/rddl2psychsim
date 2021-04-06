@@ -3,8 +3,8 @@ from typing import Dict
 from pyrddl.expr import Expression
 from psychsim.agent import Agent
 from psychsim.pwl import KeyedVector, rewardKey, makeTree, makeFuture, KeyedMatrix, KeyedTree, KeyedPlane, \
-    setToConstantMatrix
-from rddl2psychsim.conversion.expression import _ExpressionConverter
+    setToConstantMatrix, CONSTANT
+from rddl2psychsim.conversion.expression import _ExpressionConverter, is_pwl_op, nested_if
 
 __author__ = 'Pedro Sequeira'
 __email__ = 'pedrodbs@gmail.com'
@@ -39,23 +39,29 @@ class _DynamicsConverter(_ExpressionConverter):
         agent.setReward(tree, 1.)
         logging.info(f'Set agent "{agent.name}" reward to:\n{tree}')
 
-    def _create_dynamics_tree(self, key, expression: Expression, agent: Agent) -> KeyedTree:
+    def _create_dynamics_tree(self, key: str, expression: Expression, agent: Agent) -> KeyedTree:
         return makeTree(self._get_dynamics_tree(key, self._get_expression_dict(expression, agent)))
 
-    def _get_dynamics_tree(self, key, tree_dict) -> KeyedMatrix or Dict:
-        if all(isinstance(k, str) for k in tree_dict.keys()) and all(isinstance(v, float) for v in tree_dict.values()):
-            # if all key-value pairs, create a keyed vector
-            return KeyedMatrix({makeFuture(key): KeyedVector(tree_dict)})
+    def _get_dynamics_tree(self, key: str, tree_dict: Dict) -> KeyedMatrix or Dict:
 
-        if 'if' in tree_dict:
+        # just get the truth value of logical expressions
+        if len(tree_dict) == 1 and next(iter(tree_dict.keys())) in \
+                {'pwl_and', 'logic_and', 'pwl_or', 'logic_or', 'not', 'equiv', 'imply', 'equal', 'diff'}:
+            return self._get_dynamics_tree(key, nested_if(tree_dict, {CONSTANT: True}, {CONSTANT: False}))
+
+        if 'if' in tree_dict and len(tree_dict) == 3:
             # build if-then-else tree
             weights, threshold, comp = tree_dict['if']
             return {'if': KeyedPlane(KeyedVector(weights), threshold, comp),
                     True: self._get_dynamics_tree(key, tree_dict[True]),
                     False: self._get_dynamics_tree(key, tree_dict[False])}
 
-        if 'distribution' in tree_dict:
+        if 'distribution' in tree_dict and len(tree_dict) == 1:
             # create stochastic effect
             return {'distribution': [(setToConstantMatrix(key, v), p) for v, p in tree_dict['distribution']]}
+
+        # if all key-value pairs, assume linear combination of all features
+        if is_pwl_op(tree_dict):
+            return KeyedMatrix({makeFuture(key): KeyedVector(tree_dict)})
 
         raise NotImplementedError(f'Could not parse RDDL expression, got invalid tree: "{tree_dict}"!')
