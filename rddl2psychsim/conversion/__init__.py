@@ -48,7 +48,7 @@ class _ConverterBase(object):
         return next(val for c, val in self.constants.items() if c[0] == name)
 
     def _is_enum(self, name: str) -> bool:
-        for t, r in self.model.domain.types:
+        for t, _ in self.model.domain.types:
             if t == name:
                 return True
         return False
@@ -62,7 +62,7 @@ class _ConverterBase(object):
     def _get_enum_types(self, name: str) -> List[str] or None:
         for t, r in self.model.domain.types:
             if t == name:
-                return r
+                return [_.replace('@', '') for _ in r]  # strip "@" character from enum values
         return None
 
     def _get_domain(self, t_range):
@@ -135,6 +135,8 @@ class _ConverterBase(object):
         lo = self.world.variables[f]['lo']
         def_val = fluent.default if fluent.default is not None else \
             lo if lo is not None else self.world.variables[f]['elements'][0]
+        if isinstance(def_val, str):
+            def_val = def_val.replace('@', '')  # just in case it's an enum value
         self.world.setFeature(f, def_val)
 
         logging.info(f'Created feature "{f}" from {fluent.fluent_type} "{fluent.name}" of type "{fluent.range}"')
@@ -176,5 +178,7 @@ class _ConverterBase(object):
                 logging.info(f'Could not find feature corresponding to fluent "{sf}", skipping')
                 continue
             f = self._get_feature(sf)
+            if isinstance(val, str):
+                val = val.replace('@', '')  # just in case it's an enum value
             self.world.setFeature(f, val)
             logging.info(f'Initialized feature "{f}" with value "{val}"')
