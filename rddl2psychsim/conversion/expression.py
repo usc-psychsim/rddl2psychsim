@@ -9,10 +9,10 @@ __author__ = 'Pedro Sequeira'
 __email__ = 'pedrodbs@gmail.com'
 
 
-def is_pwl_op(o) -> bool:
-    return isinstance(o, dict) and \
-           all(isinstance(k, str) for k in o.keys()) and \
-           all(type(v) in {float, int, bool, str} for v in o.values())
+def is_pwl_op(op: Dict) -> bool:
+    return isinstance(op, dict) and \
+           all(isinstance(k, str) for k in op.keys()) and \
+           all(type(v) in {float, int, bool, str} for v in op.values())
 
 
 def nested_if(c, tb, fb, expression: Expression = None, agent: Agent = None) -> Dict:
@@ -46,7 +46,7 @@ def nested_if(c, tb, fb, expression: Expression = None, agent: Agent = None) -> 
     if 'equiv' in c:
         lhs, rhs = c['equiv']
         lhs = dict(lhs)
-        _update_weights(lhs, _negate_weights(rhs))
+        update_weights(lhs, negate_weights(rhs))
         return {'if': (lhs, 0, 0),  # takes equality of pwl comb in vectors (difference==0)
                 True: tb,
                 False: fb}
@@ -63,7 +63,7 @@ def nested_if(c, tb, fb, expression: Expression = None, agent: Agent = None) -> 
     if 'eq' in c:
         lhs, rhs = c['eq']
         lhs = dict(lhs)
-        _update_weights(lhs, _negate_weights(rhs))
+        update_weights(lhs, negate_weights(rhs))
         return {'if': (lhs, 0, 0),  # takes equality of pwl comb in vectors (difference==0)
                 True: tb,
                 False: fb}
@@ -71,7 +71,7 @@ def nested_if(c, tb, fb, expression: Expression = None, agent: Agent = None) -> 
     if 'neq' in c:
         lhs, rhs = c['neq']
         lhs = dict(lhs)
-        _update_weights(lhs, _negate_weights(rhs))
+        update_weights(lhs, negate_weights(rhs))
         return {'if': (lhs, 0, 0),  # takes equality of pwl comb in vectors (difference==0)
                 True: fb,  # then switch branches
                 False: tb}
@@ -79,7 +79,7 @@ def nested_if(c, tb, fb, expression: Expression = None, agent: Agent = None) -> 
     if 'gt' in c:
         lhs, rhs = c['gt']
         lhs = dict(lhs)
-        _update_weights(lhs, _negate_weights(rhs))
+        update_weights(lhs, negate_weights(rhs))
         return {'if': (lhs, 0, 1),  # takes diff of pwl comb in vectors (difference>0)
                 True: tb,
                 False: fb}
@@ -87,7 +87,7 @@ def nested_if(c, tb, fb, expression: Expression = None, agent: Agent = None) -> 
     if 'lt' in c:
         lhs, rhs = c['lt']
         lhs = dict(lhs)
-        _update_weights(lhs, _negate_weights(rhs))
+        update_weights(lhs, negate_weights(rhs))
         return {'if': (lhs, 0, -1),  # takes diff of pwl comb in vectors (difference<0)
                 True: tb,
                 False: fb}
@@ -95,7 +95,7 @@ def nested_if(c, tb, fb, expression: Expression = None, agent: Agent = None) -> 
     if 'geq' in c:
         lhs, rhs = c['geq']
         lhs = dict(lhs)
-        _update_weights(lhs, _negate_weights(rhs))
+        update_weights(lhs, negate_weights(rhs))
         return {'if': (lhs, 0, -1),  # takes diff of pwl comb in vectors (difference<0)
                 True: fb,  # then switch branches
                 False: tb}
@@ -103,7 +103,7 @@ def nested_if(c, tb, fb, expression: Expression = None, agent: Agent = None) -> 
     if 'leq' in c:
         lhs, rhs = c['leq']
         lhs = dict(lhs)
-        _update_weights(lhs, _negate_weights(rhs))
+        update_weights(lhs, negate_weights(rhs))
         return {'if': (lhs, 0, 1),  # takes diff of pwl comb in vectors (difference>0)
                 True: fb,  # then switch branches
                 False: tb}
@@ -121,11 +121,7 @@ def nested_if(c, tb, fb, expression: Expression = None, agent: Agent = None) -> 
     raise ValueError(f'Could not parse RDDL expression "{expression}", invalid nested PWL control in "{c}"!')
 
 
-def _get_const_val(s) -> float or None:
-    return s if isinstance(s, float) else float(s[CONSTANT]) if len(s) == 1 and CONSTANT in s else None
-
-
-def _update_weights(old_weights, new_weights):
+def update_weights(old_weights, new_weights):
     assert is_pwl_op(new_weights), f'Could not parse RDDL expression, invalid PWL operation in "{new_weights}"!'
     for k, v in new_weights.items():
         old_weights[k] = old_weights[k] + v if k in old_weights else v  # add weight if key already in dict
@@ -133,9 +129,13 @@ def _update_weights(old_weights, new_weights):
             del old_weights[k]  # remove if weight is 0
 
 
-def _negate_weights(weights):
+def negate_weights(weights):
     assert is_pwl_op(weights), f'Could not parse RDDL expression, invalid PWL operation in "{weights}"!'
     return {k: -v for k, v in weights.items()}  # just negate the weight
+
+
+def _get_const_val(op: Dict) -> float or None:
+    return None if not isinstance(op, dict) else float(op[CONSTANT]) if len(op) == 1 and CONSTANT in op else None
 
 
 class _ExpressionConverter(_ConverterBase):
@@ -158,7 +158,7 @@ class _ExpressionConverter(_ConverterBase):
             # just check if enumerated type is known
             name = expression.args
             if self._is_enum_type(name):
-                return {name: 1.}
+                return {CONSTANT: name.replace('@', '')}
             raise ValueError(f'Could not find enumerated type from RDDL expression "{expression}"!')
 
         if e_type == 'pvar':
@@ -211,8 +211,8 @@ class _ExpressionConverter(_ConverterBase):
             if all_consts:
                 return {CONSTANT: lhs_const + rhs_const}  # reduce
             # if addition, just add everything from both sides
-            _update_weights(weights, lhs)
-            _update_weights(weights, rhs)
+            update_weights(weights, lhs)
+            update_weights(weights, rhs)
             return weights
 
         if a_type == '-':
@@ -222,8 +222,8 @@ class _ExpressionConverter(_ConverterBase):
             if len(rhs) == 0:
                 rhs = lhs  # just switch if we only have one argument
                 lhs = {}
-            _update_weights(weights, lhs)
-            _update_weights(weights, {k: -v for k, v in rhs.items()})  # then multiply right-hand side by -1
+            update_weights(weights, lhs)
+            update_weights(weights, {k: -v for k, v in rhs.items()})  # then multiply right-hand side by -1
             return weights
 
         if a_type == '*':
@@ -271,8 +271,8 @@ class _ExpressionConverter(_ConverterBase):
             if 'pwl_and' in rhs and len(rhs) == 1:
                 rhs = rhs['pwl_and']
             if is_pwl_op(lhs) and is_pwl_op(rhs):
-                _update_weights(weights, lhs)  # if both vectors, just add everything from both sides (thresh >= len)
-                _update_weights(weights, rhs)
+                update_weights(weights, lhs)  # if both vectors, just add everything from both sides (thresh >= len)
+                update_weights(weights, rhs)
                 return {'pwl_and': weights}
             return {'logic_and': (orig_lhs, orig_rhs)}  # defer for later processing
 
@@ -291,8 +291,8 @@ class _ExpressionConverter(_ConverterBase):
             if 'pwl_or' in rhs and len(rhs) == 1:
                 rhs = rhs['pwl_or']
             if is_pwl_op(lhs) and is_pwl_op(rhs):
-                _update_weights(weights, lhs)  # if both vectors, just add everything from both sides (thresh > 0)
-                _update_weights(weights, rhs)
+                update_weights(weights, lhs)  # if both vectors, just add everything from both sides (thresh > 0)
+                update_weights(weights, rhs)
                 return {'pwl_or': weights}
             return {'logic_or': (orig_lhs, orig_rhs)}  # defer for later processing
 
@@ -431,8 +431,40 @@ class _ExpressionConverter(_ConverterBase):
             true_branch = self._get_expression_dict(expression.args[1], agent)
             false_branch = self._get_expression_dict(expression.args[2], agent)
             return nested_if(cond, true_branch, false_branch, expression, agent)
-        else:
-            raise NotImplementedError(f'Cannot parse control expression: "{expression}" of type "{c_type}"!')
+
+        if c_type == 'switch':
+            assert len(expression.args) > 1, f'Cannot parse switch expression: "{expression}", no cases provided!'
+
+            # get expression for terminal condition, has to be PWL
+            cond = self._get_expression_dict(expression.args[0], agent)
+            assert is_pwl_op(cond), f'Cannot parse switch expression: "{expression}", switch condition is not PWL!'
+
+            # get expressions for each of the branches
+            case_values = []
+            case_branches = []
+            for arg in expression.args[1:]:
+                case_type = arg[0]
+                if case_type == 'case':
+                    val = self._get_expression_dict(arg[1][0], agent)
+                    branch = self._get_expression_dict(arg[1][1], agent)
+                elif case_type == 'default':
+                    assert 'default' not in case_values, f'Cannot parse switch expression: "{expression}", ' \
+                                                         f'default branch defined more than once!'
+                    val = 'default'
+                    branch = self._get_expression_dict(arg[1], agent)
+                else:
+                    raise ValueError(f'Cannot parse switch expression: "{expression}", '
+                                     f'unknown case type: "{case_type}"!')
+
+                assert val == 'default' or is_pwl_op(val), \
+                    f'Cannot parse switch expression: "{expression}", case condition is not PWL!'
+                case_values.append(val)
+                case_branches.append(branch)
+
+            assert 'default' in case_values, f'Cannot parse switch expression: "{expression}", missing default branch!'
+            return {'switch': (cond, case_values, case_branches)}
+
+        raise NotImplementedError(f'Cannot parse control expression: "{expression}" of type "{c_type}"!')
 
     def _convert_distribution_expr(self, expression: Expression, agent: Agent) -> Dict:
         d_type = expression.etype[1]
