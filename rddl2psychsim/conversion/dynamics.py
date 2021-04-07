@@ -30,6 +30,7 @@ class _DynamicsConverter(_ExpressionConverter):
                 tree = self._create_dynamics_tree(f, cpf.expr, agent)
                 self.world.setDynamics(f, True, tree)
                 logging.info(f'Set dynamics for feature "{f}" to:\n{tree}')
+                print(f'Set dynamics for feature "{f}" to:\n{tree}')
             else:
                 raise NotImplementedError(f'Cannot convert CPF "{cpf}" of type "{f_type}"!')
 
@@ -90,7 +91,10 @@ class _DynamicsConverter(_ExpressionConverter):
 
             # if no cases for constant conditionals, return if tree
             if len(const_branches) == 0:
-                tree[False] = def_branch
+                if False in tree:
+                    tree[False] = def_branch
+                else:
+                    root = def_branch
                 return root
 
             if False in tree:
