@@ -55,7 +55,7 @@ class _ConverterBase(object):
 
     def _is_enum_type(self, name: str) -> bool:
         for _, r in self.model.domain.types:
-            if name in r:
+            if name in r or '@' + name in r:
                 return True
         return False
 

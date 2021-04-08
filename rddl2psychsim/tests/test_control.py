@@ -83,6 +83,32 @@ class TestRelational(unittest.TestCase):
         p = conv.world.getState(AG_NAME, 'p', unique=True)
         self.assertEqual(p, q if (q > r) else r)
 
+    def test_if_enum(self):
+        rddl = '''
+                domain my_test {
+                    types {
+                        enum_level : {@low, @medium, @high};
+                    };
+                    pvariables { 
+                        p : { state-fluent,  enum_level, default = @low };
+                        q : { state-fluent,  enum_level, default = @medium };
+                        a : { action-fluent, bool, default = false }; 
+                    };
+                    cpfs { p' = if (p == q) then @high else @medium; };
+                    reward = 0;
+                }
+                non-fluents my_test_empty { domain = my_test; }
+                instance my_test_inst { domain = my_test; init-state { a; }; }
+                '''
+        conv = Converter()
+        conv.convert_str(rddl, AG_NAME)
+        _p = conv.world.getState(AG_NAME, 'p', unique=True)
+        self.assertEqual(_p, 'low')
+        conv.world.step()
+        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        q = conv.world.getState(AG_NAME, 'q', unique=True)
+        self.assertEqual(p, 'high' if (_p == q) else 'medium')
+
     def test_if_nested(self):
         rddl = '''
                 domain my_test {

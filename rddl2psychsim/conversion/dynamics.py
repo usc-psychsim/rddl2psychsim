@@ -4,8 +4,8 @@ from pyrddl.expr import Expression
 from psychsim.agent import Agent
 from psychsim.pwl import KeyedVector, rewardKey, makeTree, makeFuture, KeyedMatrix, KeyedTree, KeyedPlane, \
     setToConstantMatrix, CONSTANT, noChangeMatrix
-from rddl2psychsim.conversion.expression import _ExpressionConverter, is_pwl_op, nested_if, update_weights, \
-    negate_weights
+from rddl2psychsim.conversion.expression import _ExpressionConverter, _is_linear_function, _combine_linear_functions, \
+    _negate_linear_function
 
 __author__ = 'Pedro Sequeira'
 __email__ = 'pedrodbs@gmail.com'
@@ -30,7 +30,6 @@ class _DynamicsConverter(_ExpressionConverter):
                 tree = self._create_dynamics_tree(f, cpf.expr, agent)
                 self.world.setDynamics(f, True, tree)
                 logging.info(f'Set dynamics for feature "{f}" to:\n{tree}')
-                print(f'Set dynamics for feature "{f}" to:\n{tree}')
             else:
                 raise NotImplementedError(f'Cannot convert CPF "{cpf}" of type "{f_type}"!')
 
@@ -42,25 +41,25 @@ class _DynamicsConverter(_ExpressionConverter):
         logging.info(f'Set agent "{agent.name}" reward to:\n{tree}')
 
     def _create_dynamics_tree(self, key: str, expression: Expression, agent: Agent) -> KeyedTree:
-        return makeTree(self._get_dynamics_tree(key, self._get_expression_dict(expression, agent)))
+        return makeTree(self._get_dynamics_tree(key, self._convert_expression(expression, agent)))
 
-    def _get_dynamics_tree(self, key: str, expr_dict: Dict) -> KeyedMatrix or Dict:
+    def _get_dynamics_tree(self, key: str, expr: Dict) -> KeyedMatrix or Dict:
 
         # just get the truth value of logical expressions
-        if len(expr_dict) == 1 and next(iter(expr_dict.keys())) in \
+        if len(expr) == 1 and next(iter(expr.keys())) in \
                 {'pwl_and', 'logic_and', 'pwl_or', 'logic_or', 'not', 'equiv', 'imply',
                  'eq', 'neq', 'gt', 'lt', 'geq', 'leq'}:
-            return self._get_dynamics_tree(key, nested_if(expr_dict, {CONSTANT: True}, {CONSTANT: False}))
+            return self._get_dynamics_tree(key, self._get_nested_if(expr, {CONSTANT: True}, {CONSTANT: False}))
 
-        if 'if' in expr_dict and len(expr_dict) == 3:
+        if 'if' in expr and len(expr) == 3:
             # build if-then-else tree
-            weights, threshold, comp = expr_dict['if']
+            weights, threshold, comp = expr['if']
             return {'if': KeyedPlane(KeyedVector(weights), threshold, comp),
-                    True: self._get_dynamics_tree(key, expr_dict[True]),
-                    False: self._get_dynamics_tree(key, expr_dict[False])}
+                    True: self._get_dynamics_tree(key, expr[True]),
+                    False: self._get_dynamics_tree(key, expr[False])}
 
-        if 'switch' in expr_dict and len(expr_dict) == 1:
-            cond, case_values, case_branches = expr_dict['switch']
+        if 'switch' in expr and len(expr) == 1:
+            cond, case_values, case_branches = expr['switch']
 
             # separates conditions and branches for constants and other conditional values
             const_values, const_branches = [], []
@@ -83,8 +82,7 @@ class _DynamicsConverter(_ExpressionConverter):
             for i, val in enumerate(if_values):
                 if False in tree:
                     tree = tree[False]  # nest if
-                c = dict(cond)
-                update_weights(c, negate_weights(val))  # gets difference between planes
+                c = _combine_linear_functions(cond, _negate_linear_function(val))  # gets difference between planes
                 tree['if'] = KeyedPlane(KeyedVector(c), 0, 0)  # tests PWL equality
                 tree[True] = self._get_dynamics_tree(key, if_branches[i])
                 tree[False] = {}
@@ -107,12 +105,12 @@ class _DynamicsConverter(_ExpressionConverter):
             tree[None] = def_branch
             return root
 
-        if 'distribution' in expr_dict and len(expr_dict) == 1:
+        if 'distribution' in expr and len(expr) == 1:
             # create stochastic effect
-            return {'distribution': [(setToConstantMatrix(key, v), p) for v, p in expr_dict['distribution']]}
+            return {'distribution': [(setToConstantMatrix(key, v), p) for v, p in expr['distribution']]}
 
         # if all key-value pairs, assume direct linear combination of all features
-        if is_pwl_op(expr_dict):
-            return KeyedMatrix({makeFuture(key): KeyedVector(expr_dict)})
+        if _is_linear_function(expr) or self._is_enum_expr(expr):
+            return KeyedMatrix({makeFuture(key): KeyedVector(expr)})
 
-        raise NotImplementedError(f'Could not parse RDDL expression, got invalid tree: "{expr_dict}"!')
+        raise NotImplementedError(f'Could not parse RDDL expression, got invalid tree: "{expr}"!')
