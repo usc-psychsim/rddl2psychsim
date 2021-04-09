@@ -3,6 +3,7 @@ from typing import List
 from pyrddl.pvariable import PVariable
 from pyrddl.rddl import RDDL
 from psychsim.agent import Agent
+from psychsim.pwl import rewardKey, actionKey
 from psychsim.world import World
 
 __author__ = 'Pedro Sequeira'
@@ -155,6 +156,11 @@ class _ConverterBase(object):
             # todo n-arity
             self._create_feature(sf, agent)
 
+        # create variables from non-observable fluents
+        for sf in self.model.domain.observ_fluents.values():
+            # todo n-arity
+            self._create_feature(sf, agent)
+
         logging.info(f'Total {len(self.fluent_to_feature)} features created')
 
     def _convert_actions(self, agent: Agent):
@@ -182,3 +188,15 @@ class _ConverterBase(object):
                 val = val.replace('@', '')  # just in case it's an enum value
             self.world.setFeature(f, val)
             logging.info(f'Initialized feature "{f}" with value "{val}"')
+
+    def _parse_requirements(self, agent: Agent):
+        if self.model.domain.requirements is None or len(self.model.domain.requirements) == 0:
+            return
+
+            # sets omega to observe only observ-fluents (ignore interm and state-fluents)
+        if 'partially-observed' in self.model.domain.requirements:
+            observable = [actionKey(agent.name)]  # todo what do we need here?
+            for sf in self.model.domain.observ_fluents.values():
+                if self._is_feature(sf.name):
+                    observable.append(self._get_feature(sf.name))
+            agent.omega = observable
