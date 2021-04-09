@@ -4,9 +4,10 @@
 
 - `non-fluent`, converted into constants to be used for the definition of dynamics for other variables 
 - ` state-fluent`, `interm-fluent`, and `observ-fluent`, all converted into PsychSim features
+  - <u>Note:</u> `observ-fluent` variables are automatically added to agent's `omega` if `partially-observed` is specified in the `requirements` section
 - `action-fluent`, converted into PsychSim action
 
-TODO: support for n-arity predicates; mark `interm-fluent` and `observ-fluent` variables in agent's `omega` if `partially-observed` is specified in the `requirements` section
+TODO: support for n-arity predicates
 
 ## Constants
 
@@ -47,9 +48,35 @@ TODO: support for n-arity predicates; mark `interm-fluent` and `observ-fluent` v
 Creates a deterministic/stochastic effect for the following distributions:
 
 - `KronDelta(v)`: places all probability mass on its discrete argument `v`, discrete sample is thus deterministic
-- TODO: `DiracDelta(v)`: places all probability mass on its continuous argument `v`, continuous sample is thus deterministic
+
+- `DiracDelta(v)`: places all probability mass on its continuous argument `v`, continuous sample is thus deterministic
+
 - `Bernoulli(p)`: samples a boolean with probability of true given by parameter $p\in[0,1]$
-- TODO `Discrete(var-name,p)`: samples an enumerated value with probability vector $p$ , with $(\sum_i p_i=1)$
+
+- `Discrete(var-name,p)`: samples an enumerated value with probability vector $p$ , with $(\sum_i p_i=1)$
+
+  - <u>Note:</u> only constant probabilities are allowed. 
+    But, for example the following expression:
+
+    ```python
+    Discrete(enum_level,
+      @low : if (p >= 2) then 0.5 else 0.2,
+      @medium : if (p >= 2) then 0.2 else 0.5,
+      @high : 0.3);
+    ```
+
+    could be transformed into:
+
+    ```python
+    if (q >= 2) then
+      Discrete(enum_level, @low : 0.5, @medium : 0.2, @high : 0.3)
+    else
+      Discrete(enum_level, @low : 0.2, @medium : 0.5, @high : 0.3);
+    ```
+
+    to achieve the same effect
+
 - TODO: `Normal(m,s)`: samples a continuous value from a Normal distribution with mean $\mu=$`m` and variance $\sigma^2=$`s`
+
 - TODO: `Poisson(l)`: samples an integer value from a Poisson distribution with rate parameter $\lambda=$`l` per fixed time interval
 
