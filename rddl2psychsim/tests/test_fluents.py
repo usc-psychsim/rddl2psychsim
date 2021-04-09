@@ -9,13 +9,6 @@ __email__ = 'pedrodbs@gmail.com'
 AG_NAME = 'Agent'
 
 
-def _python_switch(cond, switch):
-    for val, ret in switch.items():
-        if cond == val:
-            return ret
-    return switch['default']
-
-
 class TestTypes(unittest.TestCase):
 
     def test_int_fluent_def(self):

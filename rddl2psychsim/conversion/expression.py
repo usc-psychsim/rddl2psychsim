@@ -208,9 +208,9 @@ class _ExpressionConverter(_ConverterBase):
 
         if e_type == 'penum':
             # just check if enumerated type is known
-            name = expression.args.replace('@', '')
-            if self._is_enum_type(name):
-                return {CONSTANT: name}
+            val = expression.args.replace('@', '')
+            if self._is_enum_type(val):
+                return {CONSTANT: val}
             raise ValueError(f'Could not find enumerated type from RDDL expression "{expression}"!')
 
         if e_type == 'pvar':
@@ -515,15 +515,42 @@ class _ExpressionConverter(_ConverterBase):
         d_type = expression.etype[1]
         if d_type == 'Bernoulli':
             arg = self._convert_expression(expression.args[0], agent)
-            assert len(arg) == 1 and CONSTANT in arg, \
+            assert _get_const_val(arg) is not None, \
                 f'Cannot parse stochastic expression: "{expression}", non-constant probability: "{arg}"!'
             p = arg[CONSTANT]
-            return {'distribution': [(1., p), (0., 1 - p)]}
+            return {'distribution': [(1, p), (0, 1 - p)]}
 
         if d_type == 'KronDelta':
-            # return the argument itself, from the docs:
+            # return the argument itself, although result should be int? From the docs:
             # "places all probability mass on its discrete argument v, discrete sample is thus deterministic"
             return self._convert_expression(expression.args[0], agent)
 
-        else:
-            raise NotImplementedError(f'Cannot parse stochastic expression: "{expression}" of type "{d_type}"!')
+        if d_type == 'DiracDelta':
+            # return the argument itself. From the docs:
+            # "places all probability mass on its continuous argument v, continuous sample is thus deterministic"
+            return self._convert_expression(expression.args[0], agent)
+
+        if d_type == 'Discrete':
+            def _get_value(val):
+                if isinstance(val_type, tuple) and val_type[0] == 'enum_type' and self._is_enum(val_type[1]):
+                    if self._is_enum_type(val):
+                        return val.replace('@', '')
+                    raise ValueError(f'Cannot parse stochastic expression: "{expression}", '
+                                     f'unknown enum value "{val}" for type "{val_type}"')
+                raise ValueError(f'Cannot parse stochastic expression: "{expression}", unknown type "{val_type}"')
+
+            assert len(expression.args) > 1, \
+                f'Cannot parse stochastic expression: "{expression}", must provide at least one value!'
+
+            # return a key-value pair for the discrete distribution; has to be constant probability value
+            val_type = expression.args[0]
+            dist = []
+            for arg in expression.args[1:]:
+                k = _get_value(arg[1][0])
+                v = self._convert_expression(arg[1][1], agent)
+                assert _get_const_val(v) is not None, \
+                    f'Cannot parse stochastic expression: "{expression}", non-constant probability: "{v}"!'
+                dist.append((k, v[CONSTANT]))
+            return {'distribution': dist}
+
+        raise NotImplementedError(f'Cannot parse stochastic expression: "{expression}" of type "{d_type}"!')
