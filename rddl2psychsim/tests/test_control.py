@@ -94,7 +94,7 @@ class TestRelational(unittest.TestCase):
                         q : { state-fluent,  enum_level, default = @medium };
                         a : { action-fluent, bool, default = false }; 
                     };
-                    cpfs { p' = if (p == q) then @high else @medium; };
+                    cpfs { p' = if (p == @medium) then @high else @medium; };
                     reward = 0;
                 }
                 non-fluents my_test_empty { domain = my_test; }

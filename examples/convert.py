@@ -33,7 +33,7 @@ if __name__ == '__main__':
     for i in range(args.steps):
         logging.info('__________________________________________________')
         logging.info(f'Step {i}:')
-        conv.world.step()
+        conv.world.step(threshold=0.01)
         conv.log_state()
 
     logging.info('==================================================')

@@ -294,7 +294,7 @@ class _ExpressionConverter(_ConverterBase):
                 return _scale_linear_function(rhs, lhs_const)  # multiply right-hand side by const
             if isinstance(rhs_const, float) and _is_linear_function(lhs):
                 return _scale_linear_function(lhs, rhs_const)  # multiply left-hand side by const
-            raise ValueError(f'Non-PWL operation not supported: "{expression}"!')
+            raise ValueError(f'Non-PWL operation is not supported: "{expression}"!')
 
         elif a_type == '/':
             # if division, only works if right or both sides are constants
@@ -302,7 +302,7 @@ class _ExpressionConverter(_ConverterBase):
                 return {CONSTANT: lhs_const / rhs_const}  # reduce
             if isinstance(rhs_const, float) and _is_linear_function(lhs):
                 return _scale_linear_function(lhs, 1. / rhs_const)  # divide left-hand side by const
-            raise ValueError(f'Non-PWL operation not supported: "{expression}"!')
+            raise ValueError(f'Non-PWL operation is not supported: "{expression}"!')
 
         raise NotImplementedError(f'Cannot parse arithmetic expression: "{expression}" of type "{a_type}"!')
 
@@ -413,8 +413,9 @@ class _ExpressionConverter(_ConverterBase):
             if rhs == lhs:  # equal dicts
                 return {CONSTANT: True}
 
-            # left and right have to be pwl
-            assert _is_linear_function(lhs) and _is_linear_function(rhs), \
+            # left and right have to be linear funcs
+            assert (_is_linear_function(lhs) or self._is_enum_expr(lhs)) and \
+                   (_is_linear_function(rhs) or self._is_enum_expr(rhs)), \
                 f'Could not parse relational expression "{expression}", invalid PWL equivalence composition!'
             return {'eq': (lhs, rhs)}  # defer for later processing
 
@@ -425,8 +426,9 @@ class _ExpressionConverter(_ConverterBase):
             if rhs == lhs:  # equal dicts, so not different
                 return {CONSTANT: False}
 
-            # left and right have to be pwl
-            assert _is_linear_function(lhs) and _is_linear_function(rhs), \
+            # left and right have to be linear funcs
+            assert (_is_linear_function(lhs) or self._is_enum_expr(lhs)) and \
+                   (_is_linear_function(rhs) or self._is_enum_expr(rhs)), \
                 f'Could not parse relational expression "{expression}", invalid PWL equivalence composition!'
             return {'neq': (lhs, rhs)}  # defer for later processing
 
@@ -437,8 +439,9 @@ class _ExpressionConverter(_ConverterBase):
             if rhs == lhs:  # equal dicts, so not different
                 return {CONSTANT: False}
 
-            # left and right have to be pwl
-            assert _is_linear_function(lhs) and _is_linear_function(rhs), \
+            # left and right have to be linear funcs
+            assert (_is_linear_function(lhs) or self._is_enum_expr(lhs)) and \
+                   (_is_linear_function(rhs) or self._is_enum_expr(rhs)), \
                 f'Could not parse relational expression "{expression}", invalid PWL equivalence composition!'
             return {'gt': (lhs, rhs)}  # defer for later processing
 
@@ -449,8 +452,9 @@ class _ExpressionConverter(_ConverterBase):
             if rhs == lhs:  # equal dicts, so not different
                 return {CONSTANT: False}
 
-            # left and right have to be pwl
-            assert _is_linear_function(lhs) and _is_linear_function(rhs), \
+            # left and right have to be linear funcs
+            assert (_is_linear_function(lhs) or self._is_enum_expr(lhs)) and \
+                   (_is_linear_function(rhs) or self._is_enum_expr(rhs)), \
                 f'Could not parse relational expression "{expression}", invalid PWL equivalence composition!'
             return {'lt': (lhs, rhs)}  # defer for later processing
 
@@ -461,8 +465,9 @@ class _ExpressionConverter(_ConverterBase):
             if rhs == lhs:  # equal dicts
                 return {CONSTANT: True}
 
-            # left and right have to be pwl
-            assert _is_linear_function(lhs) and _is_linear_function(rhs), \
+            # left and right have to be linear funcs
+            assert (_is_linear_function(lhs) or self._is_enum_expr(lhs)) and \
+                   (_is_linear_function(rhs) or self._is_enum_expr(rhs)), \
                 f'Could not parse relational expression "{expression}", invalid PWL equivalence composition!'
             return {'geq': (lhs, rhs)}  # defer for later processing
 
@@ -473,8 +478,9 @@ class _ExpressionConverter(_ConverterBase):
             if rhs == lhs:  # equal dicts
                 return {CONSTANT: True}
 
-            # left and right have to be pwl
-            assert _is_linear_function(lhs) and _is_linear_function(rhs), \
+            # left and right have to be linear funcs
+            assert (_is_linear_function(lhs) or self._is_enum_expr(lhs)) and \
+                   (_is_linear_function(rhs) or self._is_enum_expr(rhs)), \
                 f'Could not parse relational expression "{expression}", invalid PWL equivalence composition!'
             return {'leq': (lhs, rhs)}  # defer for later processing
 

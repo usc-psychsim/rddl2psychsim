@@ -106,7 +106,7 @@ class _ConverterBase(object):
         agent.setAttribute('selection', 'random')
 
         model = agent.get_true_model()
-        logging.info(f'Created agent {agent.name} with properties:')
+        logging.info(f'Created agent "{agent.name}" with properties:')
         logging.info(f'\thorizon: {agent.getAttribute("horizon", model)}')
         logging.info(f'\tdiscount: {agent.getAttribute("discount", model)}')
         return agent
@@ -198,6 +198,7 @@ class _ConverterBase(object):
             logging.info(f'Initialized feature "{f}" with value "{val}"')
 
     def _parse_requirements_pre(self, agent: Agent):
+        logging.info('__________________________________________________')
 
         # get Normal distribution discretization params
         normal_stds_req = [] if self.model.domain.requirements is None else \
@@ -206,12 +207,16 @@ class _ConverterBase(object):
             normal_stds = float(normal_stds_req[0].replace('normal_stds', ''))
         else:
             normal_stds = NORMAL_STDS
+        logging.info(f'Using {normal_stds} standard devs to define the range of Normal distributions')
+
         normal_bins_req = [] if self.model.domain.requirements is None else \
             [req for req in self.model.domain.requirements if 'normal_bins' in req]
         if len(normal_bins_req) > 0:
             normal_bins = int(normal_bins_req[0].replace('normal_bins', ''))
         else:
             normal_bins = NORMAL_BINS
+        logging.info(f'Using {normal_bins} discrete bins to define the values of Normal distributions')
+
         self._normal_bins = np.linspace(-normal_stds, normal_stds, normal_bins).tolist()  # gets sample value centers
         self._normal_probs = stats.norm.pdf(self._normal_bins)  # gets corresponding sample probabilities
         self._normal_probs = (self._normal_probs / self._normal_probs.sum()).tolist()  # normalize to sum 1
@@ -220,6 +225,8 @@ class _ConverterBase(object):
         if self.model.domain.requirements is None or len(self.model.domain.requirements) == 0:
             return
 
+        logging.info('__________________________________________________')
+
         # sets omega to observe only observ-fluents (ignore interm and state-fluents)
         if 'partially-observed' in self.model.domain.requirements:
             observable = [actionKey(agent.name)]  # todo what do we need to put here?
@@ -227,3 +234,4 @@ class _ConverterBase(object):
                 if self._is_feature(sf.name):
                     observable.append(self._get_feature(sf.name))
             agent.omega = observable
+            logging.info(f'Setting partial observability for agent "{agent.name}", omega={agent.omega}')
