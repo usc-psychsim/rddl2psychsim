@@ -266,3 +266,92 @@ class TestTypes(unittest.TestCase):
         bins = np.array(conv._normal_bins)
         for k, v in zip(bins, conv._normal_probs):
             self.assertEqual(p[k], v)
+
+    def test_poisson_const(self):
+        mean = 10
+        rddl = f'''
+                domain my_test {{
+                    pvariables {{ 
+                        p : {{ state-fluent,  real, default = 0 }};
+                        a : {{ action-fluent, bool, default = false }}; 
+                    }};
+                    cpfs {{ 
+                        p' = Poisson({mean});
+                    }}; 
+                    reward = 0;
+                }}
+                non-fluents my_test_empty {{ domain = my_test; }}
+                instance my_test_inst {{ domain = my_test; init-state {{ a; }}; }}
+                '''
+        conv = Converter()
+        conv.convert_str(rddl, AG_NAME)
+        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        self.assertEqual(p, 0)
+        conv.world.step()
+        p = conv.world.getState(AG_NAME, 'p')
+        import numpy as np
+        bins = np.array(conv._normal_bins) * np.sqrt(conv._poisson_exp_rate) + mean
+        for k, v in zip(bins, conv._normal_probs):
+            self.assertEqual(p[k], v)
+
+    def test_poisson_var(self):
+        mean = 10
+        rddl = f'''
+                domain my_test {{
+                    pvariables {{ 
+                        p : {{ state-fluent,  real, default = 0 }};
+                        a : {{ action-fluent, bool, default = false }}; 
+                    }};
+                    cpfs {{ 
+                        p' = Poisson( p * 2 + {mean});
+                    }}; 
+                    reward = 0;
+                }}
+                non-fluents my_test_empty {{ domain = my_test; }}
+                instance my_test_inst {{ domain = my_test; init-state {{ a; }}; }}
+                '''
+        conv = Converter()
+        conv.convert_str(rddl, AG_NAME)
+        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        self.assertEqual(p, 0)
+        conv.world.step()
+        p = conv.world.getState(AG_NAME, 'p')
+        import numpy as np
+        bins = np.array(conv._normal_bins) * np.sqrt(conv._poisson_exp_rate) + mean
+        for k, v in zip(bins, conv._normal_probs):
+            self.assertEqual(p[k], v)
+
+    def test_poisson_params(self):
+        num_bins = 10
+        stds = 4
+        expected_rate = 25
+        mean = 20
+        rddl = f'''
+                domain my_test {{
+                    requirements {{ 
+                        normal_bins{num_bins}, 
+                        normal_stds{stds}, 
+                        poisson_exp_rate{expected_rate}
+                    }};
+                    pvariables {{ 
+                        p : {{ state-fluent,  real, default = {mean} }};
+                        a : {{ action-fluent, bool, default = false }}; 
+                    }};
+                    cpfs {{ 
+                        p' = Poisson(p);
+                    }}; 
+                    reward = 0;
+                }}
+                non-fluents my_test_empty {{ domain = my_test; }}
+                instance my_test_inst {{ domain = my_test; init-state {{ a; }}; }}
+                '''
+        conv = Converter()
+        conv.convert_str(rddl, AG_NAME)
+        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        self.assertEqual(p, mean)
+        conv.world.step()
+        p = conv.world.getState(AG_NAME, 'p')
+        import numpy as np
+        bins = np.array(conv._normal_bins) * np.sqrt(conv._poisson_exp_rate) + mean
+        for k, v in zip(bins, conv._normal_probs):
+            self.assertEqual(p[k], v)

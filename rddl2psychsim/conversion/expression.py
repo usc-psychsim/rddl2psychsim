@@ -1,4 +1,5 @@
 import logging
+import math
 from typing import Dict, Tuple, Union
 from pyrddl.expr import Expression
 from psychsim.agent import Agent
@@ -585,6 +586,24 @@ class _ExpressionConverter(_ConverterBase):
             dist = []
             for i, b in enumerate(self._normal_bins):
                 k = _combine_linear_functions(_scale_linear_function(std, b), mu)  # sample val = mean + bin * std
+                if len(k) == 0:
+                    k = {CONSTANT: 0}  # might have been ignored
+                if _get_const_val(k) == -1:
+                    k = {CONSTANT: - 1 + 1e-16}  # hack, apparently hash(-1) in python evaluates to -2, so give it nudge
+                v = self._normal_probs[i]
+                dist.append((k, v))
+
+            return {'distribution': dist}
+
+        if d_type == 'Poisson':
+            # check param, has to be linear function
+            lamb = self._convert_expression(expression.args[0], agent)
+            assert _is_linear_function(lamb), \
+                f'Cannot parse stochastic expression: "{expression}", lambda has to be linear function!'
+            dist = []
+            std = math.sqrt(self._poisson_exp_rate)  # lambda expected to be around expected rate
+            for i, b in enumerate(self._normal_bins):
+                k = _combine_linear_functions({CONSTANT: std * b}, lamb)  # sample val = lambda + bin * std
                 if len(k) == 0:
                     k = {CONSTANT: 0}  # might have been ignored
                 if _get_const_val(k) == -1:

@@ -11,9 +11,10 @@ from psychsim.world import World
 __author__ = 'Pedro Sequeira'
 __email__ = 'pedrodbs@gmail.com'
 
-# default discretization for Normal distribution
+# default discretization for distributions
 NORMAL_STDS = 3
 NORMAL_BINS = 7
+POISSON_EXP_RATE = 10
 
 
 class _ConverterBase(object):
@@ -21,6 +22,9 @@ class _ConverterBase(object):
     world: World
     _normal_bins: List[float]
     _normal_probs: List[float]
+    _poisson_exp_rate: int
+    _poisson_bins: List[int]
+    _poisson_probs: List[float]
 
     def __init__(self):
         self.fluent_to_feature = {}
@@ -220,6 +224,15 @@ class _ConverterBase(object):
         self._normal_bins = np.linspace(-normal_stds, normal_stds, normal_bins).tolist()  # gets sample value centers
         self._normal_probs = stats.norm.pdf(self._normal_bins)  # gets corresponding sample probabilities
         self._normal_probs = (self._normal_probs / self._normal_probs.sum()).tolist()  # normalize to sum 1
+
+        # get Poisson distribution discretization params
+        poisson_exp_rate_req = [] if self.model.domain.requirements is None else \
+            [req for req in self.model.domain.requirements if 'poisson_exp_rate' in req]
+        if len(poisson_exp_rate_req) > 0:
+            self._poisson_exp_rate = int(poisson_exp_rate_req[0].replace('poisson_exp_rate', ''))
+        else:
+            self._poisson_exp_rate = POISSON_EXP_RATE
+        logging.info(f'Using {self._poisson_exp_rate} as the expected rate of Poisson distributions')
 
     def _parse_requirements_post(self, agent: Agent):
         if self.model.domain.requirements is None or len(self.model.domain.requirements) == 0:

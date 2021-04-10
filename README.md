@@ -36,12 +36,18 @@ TODO: support for n-arity predicates
 
 - Equality (`==`) and inequality (`∼=`) between any numerical variable or expressions 
 - Comparison (`<`, `>`, `<=`, `>=`) between any numerical variable or expressions 
-- Note: these expressions are always converted to a PWL tree representation. If used for variable attribution, their truth value is returned in the corresponding branch. However, cannot be combined with arithmetic expressions
+- <u>Note:</u> these expressions are always converted to a PWL tree representation. If used for variable attribution, their truth value is returned in the corresponding branch. However, cannot be combined with arithmetic expressions
 
 ## Conditional/Control expressions
 
 - `if`-`then`-`else`, including nested if statements
-- `switch`-`case`-`default`: in general builds a non-binary PWL decision tree with branches for the different `case` values. Note: the `switch` expression, as well as the `case` conditions can be any arithmetic expression, however depending on the expression type a different underlying PWL tree representation will be created. Namely, constant conditional values will be used to build a single PWL tree, while expressions involving variables (fluents) will be converted in (possibly nested) if statements. `default` branch specification is always required
+
+- `switch`-`case`-`default`: in general builds a non-binary PWL decision tree with branches for the different `case` values. 
+
+  <u>Notes:</u> 
+
+  - the `switch` expression, as well as the `case` conditions can be any arithmetic expression, however depending on the expression type a different underlying PWL tree representation will be created. Namely, constant conditional values will be used to build a single PWL tree, while expressions involving variables (fluents) will be converted in (possibly nested) if statements.
+  - `default` branch specification is *always* required
 
 ## Probability distributions
 
@@ -76,12 +82,19 @@ Creates a deterministic/stochastic effect for the following distributions:
 
     to achieve the same effect
 
--  `Normal(m,s)`: samples a continuous value from a *discrete approximation* of a Normal distribution with mean $\mu=$`m` and standard deviation $\sigma=$`s`
+- `Normal(m,s)`: samples a continuous value from a *discrete approximation* of a Normal distribution $\mathcal{N}(\mu,\sigma^{2})$ with mean $\mu=$`m` and standard deviation $\sigma=$`s`. 
 
-  - <u>Notes:</u>
-    - supports arbitrary arithmetic expressions for `m` and `s`, as long as they define linear functions
-    - in RDDL's definition, `s` defines the variance, not the standard deviation. But, to allow for using numerical expressions, it needs to be the standard deviation
-    -  the number of bins/values for the discrete approximation for Normal distributions in a domain can be set in the `requirements` section via `normal_bins{INT_VAL}`. Another parameter $\tau$, defined via  `normal_stds{FLOAT_VAL}`, stipulates the finite range of values sampled from the distribution, namely $[\mu-(\tau\sigma),\mu+(\tau\sigma)]$. See example at: `examples/normal_distribution.py`
+  <u>Notes:</u>
 
-- TODO: `Poisson(l)`: samples an integer value from a Poisson distribution with rate parameter $\lambda=$`l` per fixed time interval
+  - supports arbitrary arithmetic expressions for `m` and `s`, as long as they define linear functions
+  - in RDDL's definition, `s` defines the variance, not the standard deviation. But, to allow for using numerical expressions, it needs to be the standard deviation
+  - the number of bins/values for the discrete approximation for Normal distributions in a domain can be set in the `requirements` section via `normal_bins{INT_VAL}`. Another parameter $\tau$, defined via  `normal_stds{FLOAT_VAL}`, stipulates the finite range of values sampled from the distribution, namely $[\mu-(\tau\sigma),\mu+(\tau\sigma)]$. See example at: `examples/normal_distribution.py`
+
+- `Poisson(l)`: samples a value from a *discrete approximation* of a Poisson distribution with rate parameter $\lambda=$`l` per fixed time interval. 
+
+  <u>Notes:</u>
+
+  - supports arbitrary arithmetic expressions for `l`, as long as they define linear functions
+  - the distribution is approximated via a Normal distribution $\mathcal{N}(\lambda,\sqrt{\hat{\lambda}})$, where $\hat{\lambda}$ is the expected rate of Poisson distributions for this domain. This parameter can be defined via  `poisson_exp_rate{INT_VAL}` in the `requirements` section
+  - due to this approximation, sampling from the distribution might return a value in $\mathbb{R}$ rather than $\mathbb{N}$, so further adjustments might be required
 
