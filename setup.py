@@ -14,7 +14,9 @@ setup(name='rddl2psychsim',
       ],
       install_requires=[
           'psychsim',
-          'pyrddl @ git+https://github.com/usc-psychsim/pyrddl.git'
+          'pyrddl @ git+https://github.com/usc-psychsim/pyrddl.git',
+          'numpy',
+          'scipy'
       ],
       zip_safe=True,
       python_requires='>=3.7',

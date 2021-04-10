@@ -107,7 +107,8 @@ class _DynamicsConverter(_ExpressionConverter):
 
         if 'distribution' in expr and len(expr) == 1:
             # create stochastic effect
-            return {'distribution': [(setToConstantMatrix(key, v), p) for v, p in expr['distribution']]}
+            return {'distribution': [(KeyedMatrix({makeFuture(key): KeyedVector(v)}), p)
+                                     for v, p in expr['distribution']]}
 
         # if all key-value pairs, assume direct linear combination of all features
         if _is_linear_function(expr) or self._is_enum_expr(expr):

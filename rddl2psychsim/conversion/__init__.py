@@ -1,18 +1,26 @@
 import logging
+import numpy as np
+import scipy.stats as stats
 from typing import List
 from pyrddl.pvariable import PVariable
 from pyrddl.rddl import RDDL
 from psychsim.agent import Agent
-from psychsim.pwl import rewardKey, actionKey
+from psychsim.pwl import actionKey
 from psychsim.world import World
 
 __author__ = 'Pedro Sequeira'
 __email__ = 'pedrodbs@gmail.com'
 
+# default discretization for Normal distribution
+NORMAL_STDS = 3
+NORMAL_BINS = 7
+
 
 class _ConverterBase(object):
     model: RDDL
     world: World
+    _normal_bins: List[float]
+    _normal_probs: List[float]
 
     def __init__(self):
         self.fluent_to_feature = {}
@@ -189,13 +197,32 @@ class _ConverterBase(object):
             self.world.setFeature(f, val)
             logging.info(f'Initialized feature "{f}" with value "{val}"')
 
-    def _parse_requirements(self, agent: Agent):
+    def _parse_requirements_pre(self, agent: Agent):
+
+        # get Normal distribution discretization params
+        normal_stds_req = [] if self.model.domain.requirements is None else \
+            [req for req in self.model.domain.requirements if 'normal_stds' in req]
+        if len(normal_stds_req) > 0:
+            normal_stds = float(normal_stds_req[0].replace('normal_stds', ''))
+        else:
+            normal_stds = NORMAL_STDS
+        normal_bins_req = [] if self.model.domain.requirements is None else \
+            [req for req in self.model.domain.requirements if 'normal_bins' in req]
+        if len(normal_bins_req) > 0:
+            normal_bins = int(normal_bins_req[0].replace('normal_bins', ''))
+        else:
+            normal_bins = NORMAL_BINS
+        self._normal_bins = np.linspace(-normal_stds, normal_stds, normal_bins).tolist()  # gets sample value centers
+        self._normal_probs = stats.norm.pdf(self._normal_bins)  # gets corresponding sample probabilities
+        self._normal_probs = (self._normal_probs / self._normal_probs.sum()).tolist()  # normalize to sum 1
+
+    def _parse_requirements_post(self, agent: Agent):
         if self.model.domain.requirements is None or len(self.model.domain.requirements) == 0:
             return
 
-            # sets omega to observe only observ-fluents (ignore interm and state-fluents)
+        # sets omega to observe only observ-fluents (ignore interm and state-fluents)
         if 'partially-observed' in self.model.domain.requirements:
-            observable = [actionKey(agent.name)]  # todo what do we need here?
+            observable = [actionKey(agent.name)]  # todo what do we need to put here?
             for sf in self.model.domain.observ_fluents.values():
                 if self._is_feature(sf.name):
                     observable.append(self._get_feature(sf.name))

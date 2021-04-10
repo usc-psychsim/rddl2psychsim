@@ -32,11 +32,12 @@ class Converter(_DynamicsConverter):
 
         # TODO maybe read agent(s) names from rddl file? How would we separate stuff? how about models?
         agent = self._create_world_agents(agent_name)
+        self._parse_requirements_pre(agent)
         self._convert_constants()
         self._convert_variables(agent)
         self._convert_actions(agent)
         self._convert_reward_function(agent)
         self._convert_dynamics(agent)
         self._initialize_variables()
-        self._parse_requirements(agent)
+        self._parse_requirements_post(agent)
         self.world.setOrder([{agent.name}])

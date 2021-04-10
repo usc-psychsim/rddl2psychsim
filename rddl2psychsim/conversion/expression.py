@@ -3,7 +3,7 @@ from typing import Dict, Tuple, Union
 from pyrddl.expr import Expression
 from psychsim.agent import Agent
 from psychsim.pwl import CONSTANT, actionKey
-from rddl2psychsim.conversion import _ConverterBase
+from rddl2psychsim.conversion import _ConverterBase, NORMAL_STDS, NORMAL_BINS
 
 __author__ = 'Pedro Sequeira'
 __email__ = 'pedrodbs@gmail.com'
@@ -19,7 +19,7 @@ def _is_linear_function(expr: Dict) -> bool:
     """
     return isinstance(expr, dict) and \
            all(isinstance(k, str) for k in expr.keys()) and \
-           all(type(v) in {float, int, bool} for v in expr.values())
+           all(any(map(lambda t: isinstance(v, t), [float, int, bool])) for v in expr.values())
 
 
 def _combine_linear_functions(expr1: Dict, expr2: Dict) -> Dict:
@@ -51,6 +51,19 @@ def _negate_linear_function(expr):
     """
     assert _is_linear_function(expr), f'Could not parse expression, invalid linear operation in "{expr}"!'
     return {k: -v for k, v in expr.items()}  # just negate the weight
+
+
+def _scale_linear_function(expr, factor):
+    """
+    Multiplies the weights associated with all keys in the given linear function by a given value.
+    Equivalent to a scaling function.
+    :param Dict expr: the dictionary representing the (accumulated) expression.
+    :param float factor: the multiplication factor.
+    :rtype: Dict
+    :return: a new dictionary whose values for each key are the original values multiplied by the given factor.
+    """
+    assert _is_linear_function(expr), f'Could not parse expression, invalid linear operation in "{expr}"!'
+    return {k: v * factor for k, v in expr.items()}  # just scale the weight by the constant factor
 
 
 def _get_const_val(expr: Dict) -> Union[float, None]:
@@ -238,7 +251,7 @@ class _ExpressionConverter(_ConverterBase):
             return self._convert_boolean_expr(expression, agent)
 
         if e_type == 'relational':
-            return self._convert_relational(expression, agent)
+            return self._convert_relational_expr(expression, agent)
 
         if e_type == 'control':
             return self._convert_control_expr(expression, agent)
@@ -278,9 +291,9 @@ class _ExpressionConverter(_ConverterBase):
             if all_consts:
                 return {CONSTANT: lhs_const * rhs_const}  # reduce
             if isinstance(lhs_const, float) and _is_linear_function(rhs):
-                return {k: lhs_const * v for k, v in rhs.items()}  # multiply right-hand side by const
+                return _scale_linear_function(rhs, lhs_const)  # multiply right-hand side by const
             if isinstance(rhs_const, float) and _is_linear_function(lhs):
-                return {k: rhs_const * v for k, v in lhs.items()}  # multiply left-hand side by const
+                return _scale_linear_function(lhs, rhs_const)  # multiply left-hand side by const
             raise ValueError(f'Non-PWL operation not supported: "{expression}"!')
 
         elif a_type == '/':
@@ -288,7 +301,7 @@ class _ExpressionConverter(_ConverterBase):
             if all_consts:
                 return {CONSTANT: lhs_const / rhs_const}  # reduce
             if isinstance(rhs_const, float) and _is_linear_function(lhs):
-                return {k: v / rhs_const for k, v in lhs.items()}  # divide left-hand side by const
+                return _scale_linear_function(lhs, 1. / rhs_const)  # divide left-hand side by const
             raise ValueError(f'Non-PWL operation not supported: "{expression}"!')
 
         raise NotImplementedError(f'Cannot parse arithmetic expression: "{expression}" of type "{a_type}"!')
@@ -384,7 +397,7 @@ class _ExpressionConverter(_ConverterBase):
 
         raise NotImplementedError(f'Cannot parse boolean expression: "{expression}" of type "{b_type}"!')
 
-    def _convert_relational(self, expression: Expression, agent: Agent) -> Dict:
+    def _convert_relational_expr(self, expression: Expression, agent: Agent) -> Dict:
 
         lhs = self._convert_expression(expression.args[0], agent)
         rhs = self._convert_expression(expression.args[1], agent) if len(expression.args) > 1 else {}
@@ -518,7 +531,7 @@ class _ExpressionConverter(_ConverterBase):
             assert _get_const_val(arg) is not None, \
                 f'Cannot parse stochastic expression: "{expression}", non-constant probability: "{arg}"!'
             p = arg[CONSTANT]
-            return {'distribution': [(1, p), (0, 1 - p)]}
+            return {'distribution': [({CONSTANT: 1}, p), ({CONSTANT: 0}, 1 - p)]}
 
         if d_type == 'KronDelta':
             # return the argument itself, although result should be int? From the docs:
@@ -547,10 +560,32 @@ class _ExpressionConverter(_ConverterBase):
             dist = []
             for arg in expression.args[1:]:
                 k = _get_value(arg[1][0])
-                v = self._convert_expression(arg[1][1], agent)
-                assert _get_const_val(v) is not None, \
+                v = _get_const_val(self._convert_expression(arg[1][1], agent))
+                assert v is not None, \
                     f'Cannot parse stochastic expression: "{expression}", non-constant probability: "{v}"!'
-                dist.append((k, v[CONSTANT]))
+                if v > 0:
+                    dist.append(({CONSTANT: k}, v))
+
+            assert sum(v for _, v in dist) == 1, \
+                f'Cannot parse stochastic expression: "{expression}", probabilities have to sum to 1!'
+            return {'distribution': dist}
+
+        if d_type == 'Normal':
+            # check params, have to be linear functions
+            mu = self._convert_expression(expression.args[0], agent)
+            std = self._convert_expression(expression.args[1], agent)  # assume this is std dev, not variance!
+            assert _is_linear_function(mu) and _is_linear_function(std), \
+                f'Cannot parse stochastic expression: "{expression}", mean and std have to be linear functions!'
+            dist = []
+            for i, b in enumerate(self._normal_bins):
+                k = _combine_linear_functions(_scale_linear_function(std, b), mu)  # sample val = mean + bin * std
+                if len(k) == 0:
+                    k = {CONSTANT: 0}  # might have been ignored
+                if _get_const_val(k) == -1:
+                    k = {CONSTANT: - 1 + 1e-16}  # hack, apparently hash(-1) in python evaluates to -2, so give it nudge
+                v = self._normal_probs[i]
+                dist.append((k, v))
+
             return {'distribution': dist}
 
         raise NotImplementedError(f'Cannot parse stochastic expression: "{expression}" of type "{d_type}"!')
