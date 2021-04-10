@@ -73,33 +73,7 @@ class TestTypes(unittest.TestCase):
         self.assertEqual(p[0], 0.7)
         self.assertEqual(p[1], 0.3)
 
-    def test_discrete_non_const(self):
-        rddl = '''
-                domain my_test {
-                    types {
-                        enum_level : {@low, @medium, @high}; 
-                    };
-                    pvariables { 
-                        p : { state-fluent,  enum_level, default = @low };
-                        a : { action-fluent, bool, default = false }; 
-                    };
-                    cpfs { 
-                        p' = Discrete(enum_level,
-                                @low : if (p >= 2) then 0.5 else 0.2,
-                                @medium : if (p >= 2) then 0.2 else 0.5,
-                                @high : 0.3
-                            );
-                    }; 
-                    reward = 0;
-                }
-                non-fluents my_test_empty { domain = my_test; }
-                instance my_test_inst { domain = my_test; init-state { a; }; }
-                '''
-        conv = Converter()
-        with self.assertRaises(AssertionError):
-            conv.convert_str(rddl, AG_NAME)
-
-    def test_discrete_num(self):
+    def test_discrete(self):
         rddl = '''
                 domain my_test {
                     types {
@@ -130,3 +104,165 @@ class TestTypes(unittest.TestCase):
         self.assertEqual(p['low'], 0.5)
         self.assertEqual(p['medium'], 0.2)
         self.assertEqual(p['high'], 0.3)
+
+    def test_discrete_invalid_non_const(self):
+        rddl = '''
+                domain my_test {
+                    types {
+                        enum_level : {@low, @medium, @high}; 
+                    };
+                    pvariables { 
+                        p : { state-fluent,  enum_level, default = @low };
+                        a : { action-fluent, bool, default = false }; 
+                    };
+                    cpfs { 
+                        p' = Discrete(enum_level,
+                                @low : if (p >= 2) then 0.5 else 0.2,
+                                @medium : if (p >= 2) then 0.2 else 0.5,
+                                @high : 0.3
+                            );
+                    }; 
+                    reward = 0;
+                }
+                non-fluents my_test_empty { domain = my_test; }
+                instance my_test_inst { domain = my_test; init-state { a; }; }
+                '''
+        conv = Converter()
+        with self.assertRaises(AssertionError):
+            conv.convert_str(rddl, AG_NAME)
+
+    def test_discrete_const(self):
+        rddl = '''
+                domain my_test {
+                    types {
+                        enum_level : {@low, @medium, @high}; 
+                    };
+                    pvariables { 
+                        C : { non-fluent, int, default = -0.1 };
+                        p : { state-fluent, enum_level, default = @low };
+                        a : { action-fluent, bool, default = false }; 
+                    };
+                    cpfs { 
+                        p' = Discrete(enum_level, @low : 0.2 + C, @medium : 0.5 - C, @high : 0.3);
+                    }; 
+                    reward = 0;
+                }
+                non-fluents my_test_empty { domain = my_test; }
+                instance my_test_inst { domain = my_test; init-state { a; }; }
+                '''
+        conv = Converter()
+        conv.convert_str(rddl, AG_NAME)
+        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        self.assertEqual(p, 'low')
+        conv.world.step()
+        p = conv.world.getState(AG_NAME, 'p')
+        self.assertEqual(p['low'], 0.1)
+        self.assertEqual(p['medium'], 0.6)
+        self.assertEqual(p['high'], 0.3)
+
+    def test_discrete_invalid_sum(self):
+        rddl = '''
+                domain my_test {
+                    types {
+                        enum_level : {@low, @medium, @high}; 
+                    };
+                    pvariables { 
+                        p : { state-fluent, enum_level, default = @low };
+                        a : { action-fluent, bool, default = false }; 
+                    };
+                    cpfs { 
+                        p' = Discrete(enum_level, @low : 0.2, @medium : 0.5);
+                    }; 
+                    reward = 0;
+                }
+                non-fluents my_test_empty { domain = my_test; }
+                instance my_test_inst { domain = my_test; init-state { a; }; }
+                '''
+        conv = Converter()
+        with self.assertRaises(AssertionError):
+            conv.convert_str(rddl, AG_NAME)
+
+    def test_normal_const(self):
+        mean = 3
+        std = 1.5
+        rddl = f'''
+                domain my_test {{
+                    pvariables {{ 
+                        p : {{ state-fluent,  real, default = 0 }};
+                        a : {{ action-fluent, bool, default = false }}; 
+                    }};
+                    cpfs {{ 
+                        p' = Normal({mean}, {std});
+                    }}; 
+                    reward = 0;
+                }}
+                non-fluents my_test_empty {{ domain = my_test; }}
+                instance my_test_inst {{ domain = my_test; init-state {{ a; }}; }}
+                '''
+        conv = Converter()
+        conv.convert_str(rddl, AG_NAME)
+        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        self.assertEqual(p, 0)
+        conv.world.step()
+        p = conv.world.getState(AG_NAME, 'p')
+        import numpy as np
+        bins = np.array(conv._normal_bins) * std + mean
+        for k, v in zip(bins, conv._normal_probs):
+            self.assertEqual(p[k], v)
+
+    def test_normal_var(self):
+        mean = 3
+        std = 1.5
+        rddl = f'''
+                domain my_test {{
+                    pvariables {{ 
+                        p : {{ state-fluent,  real, default = {mean} }};
+                        a : {{ action-fluent, bool, default = false }}; 
+                    }};
+                    cpfs {{ 
+                        p' = Normal(p, p+{std});
+                    }}; 
+                    reward = 0;
+                }}
+                non-fluents my_test_empty {{ domain = my_test; }}
+                instance my_test_inst {{ domain = my_test; init-state {{ a; }}; }}
+                '''
+        conv = Converter()
+        conv.convert_str(rddl, AG_NAME)
+        p_ = conv.world.getState(AG_NAME, 'p', unique=True)
+        self.assertEqual(p_, mean)
+        conv.world.step()
+        p = conv.world.getState(AG_NAME, 'p')
+        import numpy as np
+        bins = np.array(conv._normal_bins) * (std + p_) + mean
+        for k, v in zip(bins, conv._normal_probs):
+            self.assertEqual(p[k], v)
+
+    def test_normal_params(self):
+        num_bins = 10
+        stds = 4
+        rddl = f'''
+                domain my_test {{
+                    requirements {{ normal_bins{num_bins}, normal_stds{stds} }};
+                    pvariables {{ 
+                        p : {{ state-fluent,  real, default = 0 }};
+                        a : {{ action-fluent, bool, default = false }}; 
+                    }};
+                    cpfs {{ 
+                        p' = Normal(0, 1);
+                    }}; 
+                    reward = 0;
+                }}
+                non-fluents my_test_empty {{ domain = my_test; }}
+                instance my_test_inst {{ domain = my_test; init-state {{ a; }}; }}
+                '''
+        conv = Converter()
+        conv.convert_str(rddl, AG_NAME)
+        p_ = conv.world.getState(AG_NAME, 'p', unique=True)
+        self.assertEqual(p_, 0)
+        conv.world.step()
+        p = conv.world.getState(AG_NAME, 'p')
+        import numpy as np
+        bins = np.array(conv._normal_bins)
+        for k, v in zip(bins, conv._normal_probs):
+            self.assertEqual(p[k], v)
