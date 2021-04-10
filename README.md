@@ -28,7 +28,7 @@ TODO: support for n-arity predicates
 ## Arithmetic expressions
 
 - Sum (`+`) and Subtraction(`-`) can be used arbitrarily between numerical constants and variables (fluents)
-- Multiplication (` ∗`) can be used between one or two numerical constants or between a numerical constant and a variable (fluent)
+- Multiplication (` ∗`) can only be used between one or two numerical constants or between a numerical constant and a variable (fluent)
 - Division (` /`) can only be used between two numerical constants or between a variable (fluent) on the left-hand side and a constant on the right-hand side of an expression
 - TODO: aggregation over object types using `sum` and  `prod`
 
@@ -76,7 +76,12 @@ Creates a deterministic/stochastic effect for the following distributions:
 
     to achieve the same effect
 
-- TODO: `Normal(m,s)`: samples a continuous value from a Normal distribution with mean $\mu=$`m` and variance $\sigma^2=$`s`
+-  `Normal(m,s)`: samples a continuous value from a *discrete approximation* of a Normal distribution with mean $\mu=$`m` and standard deviation $\sigma=$`s`
+
+  - <u>Notes:</u>
+    - supports arbitrary arithmetic expressions for `m` and `s`, as long as they define linear functions
+    - in RDDL's definition, `s` defines the variance, not the standard deviation. But, to allow for using numerical expressions, it needs to be the standard deviation
+    -  the number of bins/values for the discrete approximation for Normal distributions in a domain can be set in the `requirements` section via `normal_bins{INT_VAL}`. Another parameter $\tau$, defined via  `normal_stds{FLOAT_VAL}`, stipulates the finite range of values sampled from the distribution, namely $[\mu-(\tau\sigma),\mu+(\tau\sigma)]$. See example at: `examples/normal_distribution.py`
 
 - TODO: `Poisson(l)`: samples an integer value from a Poisson distribution with rate parameter $\lambda=$`l` per fixed time interval
 
