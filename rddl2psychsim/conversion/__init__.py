@@ -1,7 +1,8 @@
+import itertools
 import logging
 import numpy as np
 import scipy.stats as stats
-from typing import List
+from typing import List, Tuple
 from pyrddl.pvariable import PVariable
 from pyrddl.rddl import RDDL
 from psychsim.agent import Agent
@@ -115,23 +116,39 @@ class _ConverterBase(object):
         logging.info(f'\tdiscount: {agent.getAttribute("discount", model)}')
         return agent
 
+    def _get_const_param_values(self, param_type: str) -> List[str]:
+        for p_type, p_vals in self.model.non_fluents.objects:
+            if p_type == param_type:
+                return p_vals
+        raise ValueError(f'Could not get values for param type: {param_type}!')
+
+    def _get_all_const_param_combs(self, param_types: List[str]) -> List[Tuple]:
+        param_vals = [self._get_const_param_values(p_type) for p_type in param_types]
+        return list(itertools.product(*param_vals))
+
     def _convert_constants(self):
-        # first set value of non-fluents from definition
+        # first try to initialize non-fluents from definition's default value
         logging.info('__________________________________________________')
         self.constants = {}
-        if hasattr(self.model.non_fluents, 'init_non_fluent'):
-            for nf, val in self.model.non_fluents.init_non_fluent:
-                self.constants[nf] = val
-                logging.info(f'Initialized constant "{nf}" with value "{val}"')
-
-        # try to initialize non-fluents from definition's default value
         for nf in self.model.domain.non_fluents.values():
-            if nf.arity != 0:  # can't initialize parameterizable constants
-                continue
-            nf_name = (nf.name, None)
-            if nf_name not in self.constants:  # non-fluent definition on file takes precedence
+            if nf.arity > 0:
+                # gets all parameter combinations
+                param_vals = self._get_all_const_param_combs(nf.param_types)
+                nf_combs = [(nf.name, *p_vals) for p_vals in param_vals]
+            else:
+                nf_combs = [(nf.name, None)]
+            for nf_name in nf_combs:
                 self.constants[nf_name] = nf.default
                 logging.info(f'Initialized constant "{nf_name}" with default value "{nf.default}"')
+
+        # then set value of non-fluents from initialization definition
+        if hasattr(self.model.non_fluents, 'init_non_fluent'):
+            for nf, val in self.model.non_fluents.init_non_fluent:
+                nf_name = nf if nf[1] is None else (nf[0], *nf[1])
+                if nf_name not in self.constants:  # non-fluent definition on file takes precedence
+                    raise ValueError(f'Trying to initialize non-existing non-fluent: {nf_name}!')
+                self.constants[nf_name] = val
+                logging.info(f'Initialized constant "{nf}" with value "{val}"')
 
         logging.info(f'Total {len(self.constants)} constants initialized')
 
@@ -140,7 +157,7 @@ class _ConverterBase(object):
         f_name = f'{fluent.name}'
         domain = self._get_domain(fluent.range)
 
-        # create feature
+        # create and register feature
         f = self.world.defineState(agent.name, f_name, *domain)
         self.fluent_to_feature[fluent.name] = f
 

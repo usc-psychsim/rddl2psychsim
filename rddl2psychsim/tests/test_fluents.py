@@ -271,6 +271,63 @@ class TestTypes(unittest.TestCase):
         p = conv.world.getState(AG_NAME, 'p', unique=True)
         self.assertEqual(p, 0)
 
+    def test_non_fluent_param_def(self):
+        pos_objs = {'x1': 1, 'x2': 2, 'x3': 3, 'x4': 4}
+        rddl = f'''
+                domain my_test {{
+                    types {{ pos : object; }};
+                    pvariables {{ 
+                        C(pos) : {{ non-fluent, int, default = -1}};
+                        p : {{ state-fluent, int, default = 1 }};
+                        a : {{ action-fluent, bool, default = false }}; 
+                    }};
+                    cpfs {{ p' = p + 1; }}; 
+                    reward = 0;
+                }}
+                non-fluents my_test_nf {{ 
+                    domain = my_test; 
+                    objects {{
+                        pos : {{{', '.join(pos_objs.keys())}}};
+                    }};
+                }}
+                instance my_test_inst {{ domain = my_test; init-state {{ a; }}; }}
+                '''
+        conv = Converter()
+        conv.convert_str(rddl, AG_NAME)
+        for o, v in pos_objs.items():
+            self.assertIn(('C', o), conv.constants)
+            self.assertEqual(conv.constants[('C', o)], -1)
+
+    def test_non_fluent_param_init(self):
+        pos_objs = {'x1': 1, 'x2': 2, 'x3': 3, 'x4': 4}
+        rddl = f'''
+                domain my_test {{
+                    types {{ pos : object; }};
+                    pvariables {{ 
+                        C(pos) : {{ non-fluent, int, default = -1}};
+                        p : {{ state-fluent, int, default = 1 }};
+                        a : {{ action-fluent, bool, default = false }}; 
+                    }};
+                    cpfs {{ p' = p + 1; }}; 
+                    reward = 0;
+                }}
+                non-fluents my_test_nf {{ 
+                    domain = my_test; 
+                    non-fluents {{
+                        {'; '.join(f'C({o})={v}' for o, v in pos_objs.items())};
+                    }};
+                    objects {{
+                        pos : {{{', '.join(pos_objs.keys())}}};
+                    }};
+                }}
+                instance my_test_inst {{ domain = my_test; init-state {{ a; }}; }}
+                '''
+        conv = Converter()
+        conv.convert_str(rddl, AG_NAME)
+        for o, v in pos_objs.items():
+            self.assertIn(('C', o), conv.constants)
+            self.assertEqual(conv.constants[('C', o)], v)
+
     def test_partial_observability(self):
         rddl = '''
                 domain my_test {

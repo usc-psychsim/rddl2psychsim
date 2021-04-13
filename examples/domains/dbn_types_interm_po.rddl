@@ -5,7 +5,7 @@
 //
 // Author: Scott Sanner (ssanner [at] gmail.com)
 //         Modified by Pedro Sequeira (pedrodbs [at] gmail.com) to
-           support PsychSim conversion (PWL operations only).
+//         support PsychSim conversion (PWL operations only).
 ////////////////////////////////////////////////////////////////////////
 domain prop_dbn2 {
   	
