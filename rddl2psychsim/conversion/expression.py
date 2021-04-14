@@ -230,13 +230,6 @@ class _ExpressionConverter(_ConverterBase):
             raise ValueError(f'Could not find enumerated type from RDDL expression "{expression}"!')
 
         if e_type == 'pvar':
-            name = args[0]
-            if self._is_feature(name):  # feature
-                return {self._get_feature(name): 1.}
-
-            if self._is_action(name, agent):
-                return {'action': self._get_action(name, agent)}  # identify this as the agent's action
-
             name, params = args
             if params is not None:
                 # try to replace param placeholder with value on dict
@@ -244,6 +237,13 @@ class _ExpressionConverter(_ConverterBase):
             else:
                 params = (None,)
             name = (name,) + params
+
+            if self._is_feature(name):  # feature
+                return {self._get_feature(name): 1.}
+
+            if self._is_action(name, agent):
+                return {'action': self._get_action(name, agent)}  # identify this as the agent's action
+
             if self._is_constant(name):  # named constant
                 try:
                     value = self._get_constant_value(name)

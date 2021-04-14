@@ -38,6 +38,6 @@ class Converter(_DynamicsConverter):
         self._convert_actions(agent)
         self._convert_reward_function(agent)
         self._convert_dynamics(agent)
-        self._initialize_variables()
+        self._initialize_variables(agent)
         self._parse_requirements_post(agent)
         self.world.setOrder([{agent.name}])

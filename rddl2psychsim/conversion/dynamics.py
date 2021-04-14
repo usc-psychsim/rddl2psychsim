@@ -22,14 +22,23 @@ class _DynamicsConverter(_ExpressionConverter):
         for cpf in self.model.domain.cpfs[1]:
             f_type = cpf.pvar[0]
             if f_type == 'pvar_expr':
-                # todo n-arity
                 name = cpf.pvar[1][0].replace('\'', '')
-                if not self._is_feature(name):
-                    raise ValueError(f'Could not find feature for fluent "{name}" in CPF "{cpf}"!')
-                f = self._get_feature(name)
-                tree = self._create_dynamics_tree(f, cpf.expr, agent)
-                self.world.setDynamics(f, True, tree)
-                logging.info(f'Set dynamics for feature "{f}" to:\n{tree}')
+                if cpf.pvar[1][1] is None:
+                    f_combs = [(name, None)]
+                else:
+                    # gets all combinations for features
+                    param_types = [param_type[1][0] for param_type in cpf.pvar[1][1]]
+                    param_vals = self._get_all_param_combs(param_types)
+                    f_combs = [(name, *p_vals) for p_vals in param_vals]
+
+                # sets dynamics for each feature
+                for f_comb in f_combs:
+                    if not self._is_feature(f_comb):
+                        raise ValueError(f'Could not find feature for fluent "{f_comb}" in CPF "{cpf}"!')
+                    f = self._get_feature(f_comb)
+                    tree = self._create_dynamics_tree(f, cpf.expr, agent)
+                    self.world.setDynamics(f, True, tree)
+                    logging.info(f'Set dynamics for feature "{f}" to:\n{tree}')
             else:
                 raise NotImplementedError(f'Cannot convert CPF "{cpf}" of type "{f_type}"!')
 

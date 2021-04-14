@@ -33,7 +33,13 @@ class _ConverterBase(object):
         self.constants = {}
         self.actions = {}
 
-    def log_state(self, features: List[str] = None):
+    def log_state(self, features: List[str] = None) -> None:
+        """
+        Logs (INFO level) the current state of the PsychSim world.
+        Only prints features that were converted from RDDL.
+        :param List[str] features: the features whose current value are to be printed. `None` will print all
+        features on record.
+        """
         for f in self.fluent_to_feature.values():
             if features is None or f in features:
                 val = str(self.world.getFeature(f)).replace('\n', '\t')
@@ -41,6 +47,12 @@ class _ConverterBase(object):
 
     @staticmethod
     def get_fluent_name(f: Tuple) -> str:
+        """
+        Gets an identifier name for the given (possibly parameterized) fluent.
+        :param Tuple f: the (possibly parameterized) fluent, e.g., `('p', None)` or `('p', x1, y1)`.
+        :rtype: str
+        :return: the identifier string for the fluent.
+        """
         if isinstance(f, tuple):
             f = tuple(n for n in f if n is not None)
             if len(f) == 1:
