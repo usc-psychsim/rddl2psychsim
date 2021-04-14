@@ -6,8 +6,7 @@
 - ` state-fluent`, `interm-fluent`, and `observ-fluent`, all converted into PsychSim features
   - <u>Note:</u> `observ-fluent` variables are automatically added to agent's `omega` if `partially-observed` is specified in the `requirements` section
 - `action-fluent`, converted into PsychSim action
-
-TODO: support for n-arity predicates
+- Supports parameterized (n-arity) predicates
 
 ## Constants
 
@@ -28,15 +27,30 @@ TODO: support for n-arity predicates
 ## Arithmetic expressions
 
 - Sum (`+`) and Subtraction(`-`) can be used arbitrarily between numerical constants and variables (fluents)
+
 - Multiplication (` ∗`) can only be used between one or two numerical constants or between a numerical constant and a variable (fluent)
+
 - Division (` /`) can only be used between two numerical constants or between a variable (fluent) on the left-hand side and a constant on the right-hand side of an expression
-- TODO: aggregation over object types using `sum` and  `prod`
+
+- Aggregation over object types using:
+
+  - `sum`, supports only numerical expressions (linear functions) as sub-expression, e.g.:
+
+    ```yacas
+    p' = sum_{?x : obj, ?y : obj}[ q(?x) + 2 * r(?y) ];
+    ```
+
+  - `prod`, supports only linear functions using numerical constants and constant variables (non-fluents) as sub-expression, e.g.:
+
+    ```yacas
+    p' = prod_{?x : obj}[ 2 * CONST(?x) ];
+    ```
 
 ## Relational expressions
 
 - Equality (`==`) and inequality (`∼=`) between any numerical variable or expressions 
 - Comparison (`<`, `>`, `<=`, `>=`) between any numerical variable or expressions 
-- <u>Note:</u> these expressions are always converted to a PWL tree representation. If used for variable attribution, their truth value is returned in the corresponding branch. However, cannot be combined with arithmetic expressions
+- <u>Note:</u> these expressions are always converted to a PWL tree representation. If used for variable attribution, their truth value is returned in the corresponding branch. However, they cannot be combined with arithmetic expressions
 
 ## Conditional/Control expressions
 
@@ -64,7 +78,7 @@ Creates a deterministic/stochastic effect for the following distributions:
   - <u>Note:</u> only constant probabilities are allowed. 
     But, for example the following expression:
 
-    ```python
+    ```yacas
     Discrete(enum_level,
       @low : if (p >= 2) then 0.5 else 0.2,
       @medium : if (p >= 2) then 0.2 else 0.5,
@@ -73,7 +87,7 @@ Creates a deterministic/stochastic effect for the following distributions:
 
     could be transformed into:
 
-    ```python
+    ```yacas
     if (q >= 2) then
       Discrete(enum_level, @low : 0.5, @medium : 0.2, @high : 0.3)
     else
