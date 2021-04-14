@@ -1,3 +1,4 @@
+import copy
 import logging
 import math
 from typing import Dict, Tuple, Union
@@ -209,32 +210,40 @@ class _ExpressionConverter(_ConverterBase):
 
         raise ValueError(f'Could not parse RDDL expression "{expression}", invalid nested PWL control in "{c}"!')
 
-    def _convert_expression(self, expression: Expression, agent: Agent) -> Dict:
+    def _convert_expression(self, expression: Expression, agent: Agent, param_map: Dict[str, str] = None) -> Dict:
 
         # process leaf node, try to get feature name or constant value
         e_type = expression.etype[0]
+        args = expression.args
         if e_type == 'constant':
             try:
-                return {CONSTANT: expression.args}
+                return {CONSTANT: args}
             except ValueError as e:
-                logging.info(f'Could not convert value "{expression.args}" to float in RDDL expression "{expression}"!')
+                logging.info(f'Could not convert value "{args}" to float in RDDL expression "{expression}"!')
                 raise e
 
         if e_type == 'penum':
             # just check if enumerated type is known
-            val = expression.args.replace('@', '')
+            val = args.replace('@', '')
             if self._is_enum_type(val):
                 return {CONSTANT: val}
             raise ValueError(f'Could not find enumerated type from RDDL expression "{expression}"!')
 
         if e_type == 'pvar':
-            name = expression.args[0]
+            name = args[0]
             if self._is_feature(name):  # feature
                 return {self._get_feature(name): 1.}
 
             if self._is_action(name, agent):
                 return {'action': self._get_action(name, agent)}  # identify this as the agent's action
 
+            name, params = args
+            if params is not None:
+                # try to replace param placeholder with value on dict
+                params = tuple([param_map[p] for p in params if p in param_map])
+            else:
+                params = (None,)
+            name = (name,) + params
             if self._is_constant(name):  # named constant
                 try:
                     value = self._get_constant_value(name)
@@ -259,6 +268,9 @@ class _ExpressionConverter(_ConverterBase):
 
         if e_type == 'randomvar':
             return self._convert_distribution_expr(expression, agent)
+
+        if e_type == 'aggregation':
+            return self._convert_aggregation_expr(expression, agent)
 
         # not yet implemented
         raise NotImplementedError(f'Cannot parse expression: "{expression}" of type "{e_type}"!')
@@ -614,3 +626,24 @@ class _ExpressionConverter(_ConverterBase):
             return {'distribution': dist}
 
         raise NotImplementedError(f'Cannot parse stochastic expression: "{expression}" of type "{d_type}"!')
+
+    def _convert_aggregation_expr(self, expression: Expression, agent: Agent) -> Dict:
+        d_type = expression.etype[1]
+
+        if d_type == 'sum':
+            assert all(len(arg) == 2 and arg[0] == 'typed_var' for arg in expression.args[:-1]), \
+                f'Cannot parse aggregation expression: "{expression}", invalid summation arguments!'
+
+            # first get mapping param -> param type values
+            param_names = [arg[1][0] for arg in expression.args[:-1]]
+            param_types = [arg[1][1] for arg in expression.args[:-1]]
+            param_combs = self._get_all_param_combs(param_types)
+
+            # then combine linear functions resulting from param substitutions in sub-expressions
+            lf = {}
+            for param_comb in param_combs:
+                expr = self._convert_expression(expression.args[-1], agent, dict(zip(param_names, param_comb)))
+                lf = _combine_linear_functions(lf, expr)  # sum linear functions
+            return lf
+
+        raise NotImplementedError(f'Cannot parse aggregation expression: "{expression}" of type "{d_type}"!')

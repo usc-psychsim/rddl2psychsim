@@ -328,6 +328,78 @@ class TestTypes(unittest.TestCase):
             self.assertIn(('C', o), conv.constants)
             self.assertEqual(conv.constants[('C', o)], v)
 
+    def test_non_fluent_multi_param_init(self):
+        pos_objs = {('x1', 'x1'): 1,
+                    ('x1', 'x2'): 2,
+                    ('x2', 'x1'): 3,
+                    ('x2', 'x2'): 4}
+        rddl = f'''
+                domain my_test {{
+                    types {{ 
+                        pos : object;
+                    }};
+                    pvariables {{ 
+                        C(pos, pos) : {{ non-fluent, int, default = -1}};
+                        p : {{ state-fluent, int, default = 1 }};
+                        a : {{ action-fluent, bool, default = false }}; 
+                    }};
+                    cpfs {{ p' = p + 1; }}; 
+                    reward = 0;
+                }}
+                non-fluents my_test_nf {{ 
+                    domain = my_test; 
+                    non-fluents {{
+                        {'; '.join(f'C({",".join(o)}) = {v}' for o, v in pos_objs.items())};
+                    }};
+                    objects {{
+                        pos : {{{', '.join({x for x, _ in pos_objs.keys()})}}};
+                    }};
+                }}
+                instance my_test_inst {{ domain = my_test; init-state {{ a; }}; }}
+                '''
+        conv = Converter()
+        conv.convert_str(rddl, AG_NAME)
+        for o, v in pos_objs.items():
+            self.assertIn(('C', *o), conv.constants)
+            self.assertEqual(conv.constants[('C', *o)], v)
+
+    def test_non_fluent_multi_param_init2(self):
+        pos_objs = {('x1', 'y1'): 1,
+                    ('x1', 'y2'): 2,
+                    ('x2', 'y1'): 3,
+                    ('x2', 'y2'): 4}
+        rddl = f'''
+                domain my_test {{
+                    types {{ 
+                        x_pos : object;
+                        y_pos : object; 
+                    }};
+                    pvariables {{ 
+                        C(x_pos, y_pos) : {{ non-fluent, int, default = -1}};
+                        p : {{ state-fluent, int, default = 1 }};
+                        a : {{ action-fluent, bool, default = false }}; 
+                    }};
+                    cpfs {{ p' = p + 1; }}; 
+                    reward = 0;
+                }}
+                non-fluents my_test_nf {{ 
+                    domain = my_test; 
+                    non-fluents {{
+                        {'; '.join(f'C({",".join(o)}) = {v}' for o, v in pos_objs.items())};
+                    }};
+                    objects {{
+                        x_pos : {{{', '.join({x for x, _ in pos_objs.keys()})}}};
+                        y_pos : {{{', '.join({y for _, y in pos_objs.keys()})}}};
+                    }};
+                }}
+                instance my_test_inst {{ domain = my_test; init-state {{ a; }}; }}
+                '''
+        conv = Converter()
+        conv.convert_str(rddl, AG_NAME)
+        for o, v in pos_objs.items():
+            self.assertIn(('C', *o), conv.constants)
+            self.assertEqual(conv.constants[('C', *o)], v)
+
     def test_partial_observability(self):
         rddl = '''
                 domain my_test {

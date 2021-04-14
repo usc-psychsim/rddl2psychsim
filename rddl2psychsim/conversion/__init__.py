@@ -38,11 +38,10 @@ class _ConverterBase(object):
                 val = str(self.world.getFeature(f)).replace('\n', '\t')
                 logging.info(f'{f}: {val}')
 
-    def _is_feature(self, name: str) -> bool:
-        # todo n-arity
+    def _is_feature(self, name: Tuple) -> bool:
         return name in self.fluent_to_feature
 
-    def _get_feature(self, name: str) -> str:
+    def _get_feature(self, name: Tuple) -> str:
         # todo n-arity
         return self.fluent_to_feature[name]
 
@@ -54,12 +53,11 @@ class _ConverterBase(object):
         # todo n-arity
         return self.actions[agent.name][name]
 
-    def _is_constant(self, name: str) -> bool:
-        return any(c[0] == name for c in self.constants.keys())
+    def _is_constant(self, name: Tuple) -> bool:
+        return name in self.constants
 
-    def _get_constant_value(self, name: str) -> object:
-        # todo n-arity
-        return next(val for c, val in self.constants.items() if c[0] == name)
+    def _get_constant_value(self, name: Tuple) -> object:
+        return self.constants[name]
 
     def _is_enum(self, name: str) -> bool:
         for t, _ in self.model.domain.types:
@@ -95,6 +93,16 @@ class _ConverterBase(object):
 
         raise ValueError(f'Could not get domain for range type: {t_range}!')
 
+    def _get_param_values(self, param_type: str) -> List[str]:
+        for p_type, p_vals in self.model.non_fluents.objects:
+            if p_type == param_type:
+                return p_vals
+        raise ValueError(f'Could not get values for param type: {param_type}!')
+
+    def _get_all_param_combs(self, param_types: List[str]) -> List[Tuple]:
+        param_vals = [self._get_param_values(p_type) for p_type in param_types]
+        return list(itertools.product(*param_vals))
+
     def _create_world_agents(self, agent_name: str):
         # create world and agent #TODO read agent(s) name(s) from RDDL?
         logging.info('__________________________________________________')
@@ -116,16 +124,6 @@ class _ConverterBase(object):
         logging.info(f'\tdiscount: {agent.getAttribute("discount", model)}')
         return agent
 
-    def _get_const_param_values(self, param_type: str) -> List[str]:
-        for p_type, p_vals in self.model.non_fluents.objects:
-            if p_type == param_type:
-                return p_vals
-        raise ValueError(f'Could not get values for param type: {param_type}!')
-
-    def _get_all_const_param_combs(self, param_types: List[str]) -> List[Tuple]:
-        param_vals = [self._get_const_param_values(p_type) for p_type in param_types]
-        return list(itertools.product(*param_vals))
-
     def _convert_constants(self):
         # first try to initialize non-fluents from definition's default value
         logging.info('__________________________________________________')
@@ -133,10 +131,10 @@ class _ConverterBase(object):
         for nf in self.model.domain.non_fluents.values():
             if nf.arity > 0:
                 # gets all parameter combinations
-                param_vals = self._get_all_const_param_combs(nf.param_types)
+                param_vals = self._get_all_param_combs(nf.param_types)
                 nf_combs = [(nf.name, *p_vals) for p_vals in param_vals]
             else:
-                nf_combs = [(nf.name, None)]
+                nf_combs = [(nf.name, None)]  # not-parameterized constant
             for nf_name in nf_combs:
                 self.constants[nf_name] = nf.default
                 logging.info(f'Initialized constant "{nf_name}" with default value "{nf.default}"')
@@ -145,7 +143,7 @@ class _ConverterBase(object):
         if hasattr(self.model.non_fluents, 'init_non_fluent'):
             for nf, val in self.model.non_fluents.init_non_fluent:
                 nf_name = nf if nf[1] is None else (nf[0], *nf[1])
-                if nf_name not in self.constants:  # non-fluent definition on file takes precedence
+                if nf_name not in self.constants:
                     raise ValueError(f'Trying to initialize non-existing non-fluent: {nf_name}!')
                 self.constants[nf_name] = val
                 logging.info(f'Initialized constant "{nf}" with value "{val}"')
