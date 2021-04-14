@@ -21,6 +21,7 @@ POISSON_EXP_RATE = 10
 class _ConverterBase(object):
     model: RDDL
     world: World
+
     _normal_bins: List[float]
     _normal_probs: List[float]
     _poisson_exp_rate: int
@@ -38,26 +39,32 @@ class _ConverterBase(object):
                 val = str(self.world.getFeature(f)).replace('\n', '\t')
                 logging.info(f'{f}: {val}')
 
+    @staticmethod
+    def get_fluent_name(f: Tuple) -> str:
+        if isinstance(f, tuple):
+            f = tuple(n for n in f if n is not None)
+            if len(f) == 1:
+                f = f[0]
+            return str(f).replace('\'', '').replace('"', '')
+        return str(f)
+
     def _is_feature(self, name: Tuple) -> bool:
-        return name in self.fluent_to_feature
+        return self.get_fluent_name(name) in self.fluent_to_feature
 
     def _get_feature(self, name: Tuple) -> str:
-        # todo n-arity
-        return self.fluent_to_feature[name]
+        return self.fluent_to_feature[self.get_fluent_name(name)]
 
-    def _is_action(self, name: str, agent: Agent) -> bool:
-        # todo n-arity
-        return agent.name in self.actions and name in self.actions[agent.name]
+    def _is_action(self, name: Tuple, agent: Agent) -> bool:
+        return agent.name in self.actions and self.get_fluent_name(name) in self.actions[agent.name]
 
-    def _get_action(self, name: str, agent: Agent) -> str:
-        # todo n-arity
-        return self.actions[agent.name][name]
+    def _get_action(self, name: Tuple, agent: Agent) -> str:
+        return self.actions[agent.name][self.get_fluent_name(name)]
 
     def _is_constant(self, name: Tuple) -> bool:
-        return name in self.constants
+        return self.get_fluent_name(name) in self.constants
 
     def _get_constant_value(self, name: Tuple) -> object:
-        return self.constants[name]
+        return self.constants[self.get_fluent_name(name)]
 
     def _is_enum(self, name: str) -> bool:
         for t, _ in self.model.domain.types:
@@ -136,6 +143,7 @@ class _ConverterBase(object):
             else:
                 nf_combs = [(nf.name, None)]  # not-parameterized constant
             for nf_name in nf_combs:
+                nf_name = self.get_fluent_name(nf_name)
                 self.constants[nf_name] = nf.default
                 logging.info(f'Initialized constant "{nf_name}" with default value "{nf.default}"')
 
@@ -143,6 +151,7 @@ class _ConverterBase(object):
         if hasattr(self.model.non_fluents, 'init_non_fluent'):
             for nf, val in self.model.non_fluents.init_non_fluent:
                 nf_name = nf if nf[1] is None else (nf[0], *nf[1])
+                nf_name = self.get_fluent_name(nf_name)
                 if nf_name not in self.constants:
                     raise ValueError(f'Trying to initialize non-existing non-fluent: {nf_name}!')
                 self.constants[nf_name] = val
@@ -150,43 +159,48 @@ class _ConverterBase(object):
 
         logging.info(f'Total {len(self.constants)} constants initialized')
 
-    def _create_feature(self, fluent: PVariable, agent: Agent) -> str:
-        # todo n-arity
-        f_name = f'{fluent.name}'
+    def _create_features(self, fluent: PVariable, agent: Agent) -> List[str]:
+        if fluent.arity > 0:
+            # gets all parameter combinations
+            param_vals = self._get_all_param_combs(fluent.param_types)
+            f_combs = [(fluent.name, *p_vals) for p_vals in param_vals]
+        else:
+            f_combs = [(fluent.name, None)]  # not-parameterized constant
         domain = self._get_domain(fluent.range)
 
-        # create and register feature
-        f = self.world.defineState(agent.name, f_name, *domain)
-        self.fluent_to_feature[fluent.name] = f
+        # create and register features
+        feats = []
+        for f_name in f_combs:
+            f_name = self.get_fluent_name(f_name)
+            f = self.world.defineState(agent.name, f_name, *domain)
+            self.fluent_to_feature[f_name] = f
 
-        # set to default value (if list assume first of list)
-        lo = self.world.variables[f]['lo']
-        def_val = fluent.default if fluent.default is not None else \
-            lo if lo is not None else self.world.variables[f]['elements'][0]
-        if isinstance(def_val, str):
-            def_val = def_val.replace('@', '')  # just in case it's an enum value
-        self.world.setFeature(f, def_val)
+            # set to default value (if list assume first of list)
+            lo = self.world.variables[f]['lo']
+            def_val = fluent.default if fluent.default is not None else \
+                lo if lo is not None else self.world.variables[f]['elements'][0]
+            if isinstance(def_val, str):
+                def_val = def_val.replace('@', '')  # just in case it's an enum value
+            self.world.setFeature(f, def_val)
 
-        logging.info(f'Created feature "{f}" from {fluent.fluent_type} "{fluent.name}" of type "{fluent.range}"')
-        return f
+            logging.info(f'Created feature "{f}" from {fluent.fluent_type} "{fluent.name}" of type "{fluent.range}"')
+            feats.append(f)
+        return feats
 
     def _convert_variables(self, agent: Agent):
         # create variables from state fluents
         logging.info('__________________________________________________')
         self.fluent_to_feature = {}
         for sf in self.model.domain.state_fluents.values():
-            # todo n-arity
-            self._create_feature(sf, agent)
+            self._create_features(sf, agent)
 
         # create variables from intermediate fluents
         for sf in self.model.domain.intermediate_fluents.values():
-            # todo n-arity
-            self._create_feature(sf, agent)
+            self._create_features(sf, agent)
 
         # create variables from non-observable fluents
         for sf in self.model.domain.observ_fluents.values():
-            # todo n-arity
-            self._create_feature(sf, agent)
+            self._create_features(sf, agent)
 
         logging.info(f'Total {len(self.fluent_to_feature)} features created')
 
@@ -201,16 +215,15 @@ class _ConverterBase(object):
 
         logging.info(f'Total {len(self.actions[agent.name])} actions created for agent "{agent.name}"')
 
-    def _initialize_variables(self):
+    def _initialize_variables(self, agent: Agent):
         # initialize variables from instance def
         logging.info('__________________________________________________')
         for sf, val in self.model.instance.init_state:
-            # todo n-arity
-            sf = sf[0]
-            if not self._is_feature(sf):
-                logging.info(f'Could not find feature corresponding to fluent "{sf}", skipping')
-                continue
-            f = self._get_feature(sf)
+            f_name = sf if sf[1] is None else (sf[0], *sf[1])
+            if self._is_action(f_name, agent):
+                continue  # skip action initialization
+            assert self._is_feature(f_name), f'Could not find feature "{f_name}" corresponding to fluent "{sf}"!'
+            f = self._get_feature(f_name)
             if isinstance(val, str):
                 val = val.replace('@', '')  # just in case it's an enum value
             self.world.setFeature(f, val)
