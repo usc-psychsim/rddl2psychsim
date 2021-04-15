@@ -685,7 +685,7 @@ class _ExpressionConverter(_ConverterBase):
 
         if d_type == 'forall':
             assert all(len(arg) == 2 and arg[0] == 'typed_var' for arg in expression.args[:-1]), \
-                f'Cannot parse aggregation expression: "{expression}", invalid quantification arguments!'
+                f'Cannot parse aggregation expression: "{expression}", invalid conjunction arguments!'
 
             # combine param substitutions in sub-expressions
             param_maps = self._get_param_mappings(expression)
@@ -698,12 +698,35 @@ class _ExpressionConverter(_ConverterBase):
                 lf = {}
                 for expr in sub_exprs:
                     lf = _combine_linear_functions(lf, expr)  # sum linear functions
-                return {'linear_and': {CONSTANT: 0} if len(lf) == 0 else lf}
+                return {CONSTANT: False} if len(lf) == 0 else {'linear_and': lf}
 
-            # otherwise build nested AND tree
+            # otherwise build nested AND tree # TODO can do plane conjunction when supported in PsychSim
             lf = sub_exprs[0]
             for expr in sub_exprs[1:]:
                 lf = {'logic_and': (lf, expr)}  # AND tree
+            return lf
+
+        if d_type == 'exists':
+            assert all(len(arg) == 2 and arg[0] == 'typed_var' for arg in expression.args[:-1]), \
+                f'Cannot parse aggregation expression: "{expression}", invalid disjunction arguments!'
+
+            # combine param substitutions in sub-expressions
+            param_maps = self._get_param_mappings(expression)
+            sub_exprs = []
+            for p_map in param_maps:
+                sub_exprs.append(self._convert_expression(expression.args[-1], agent, {**param_map, **p_map}))
+
+            # if all linear ops, just add everything (linear OR)
+            if all(_is_linear_function(expr) for expr in sub_exprs):
+                lf = {}
+                for expr in sub_exprs:
+                    lf = _combine_linear_functions(lf, expr)  # sum linear functions
+                return {CONSTANT: False} if len(lf) == 0 else {'linear_or': lf}
+
+            # otherwise build nested OR tree # TODO can do plane disjunction when supported in PsychSim
+            lf = sub_exprs[0]
+            for expr in sub_exprs[1:]:
+                lf = {'logic_or': (lf, expr)}  # AND tree
             return lf
 
         raise NotImplementedError(f'Cannot parse aggregation expression: "{expression}" of type "{d_type}"!')

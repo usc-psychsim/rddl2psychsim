@@ -18,11 +18,25 @@
 ## Logical expressions
 
 - And (`^`)
+
 - Or (`|`)
+
 - Not (`∼`)
+
 - Implies (`=>`)
+
 - Equivalence (`<=>`)
-- TODO: quantification over variables using `forall` and `exists`
+
+- Quantification over variables using:
+
+  - `forall` , corresponding to a conjunction of the provided expression iterated over the parameters
+
+  - `exists`, corresponding to a disjunction of the provided expression iterated over the parameters
+
+    <u>Notes:</u>
+
+    - sub-expression can be of arithmetic, boolean or relational type, but *not* a control statement (`if`, ` switch`)
+    - depending on the sub-expression type, a different underlying PWL tree representation will be created. Namely, numerical and boolean expressions (linear functions) will be used to build a single PWL tree, while relational expressions will be converted in nested `if` statements
 
 ## Arithmetic expressions
 
@@ -60,7 +74,7 @@
 
   <u>Notes:</u> 
 
-  - the `switch` expression, as well as the `case` conditions can be any arithmetic expression, however depending on the expression type a different underlying PWL tree representation will be created. Namely, constant conditional values will be used to build a single PWL tree, while expressions involving variables (fluents) will be converted in (possibly nested) if statements.
+  - the `switch` expression, as well as the `case` conditions can be any arithmetic expression, however depending on the expression type a different underlying PWL tree representation will be created. Namely, constant conditional values will be used to build a single PWL tree, while expressions involving variables (fluents) will be converted in (possibly nested) `if` statements
   - `default` branch specification is *always* required
 
 ## Probability distributions
