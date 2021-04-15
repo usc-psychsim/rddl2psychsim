@@ -109,7 +109,7 @@ class TestRelational(unittest.TestCase):
         q = conv.world.getState(AG_NAME, 'q', unique=True)
         self.assertEqual(p, 'high' if (_p == q) else 'medium')
 
-    def test_if_nested(self):
+    def test_if_nested_rel(self):
         rddl = '''
                 domain my_test {
                     pvariables { 
@@ -137,6 +137,40 @@ class TestRelational(unittest.TestCase):
         if q > r:
             if q > s:
                 p_ = q
+            else:
+                p_ = 0
+        else:
+            p_ = -1
+        self.assertEqual(p, p_)
+
+    def test_if_nested_bool(self):
+        rddl = '''
+                domain my_test {
+                    pvariables { 
+                        p : { state-fluent,  int, default = -1 };
+                        q : { state-fluent,  bool, default = false };
+                        r : { state-fluent,  bool, default = true };
+                        s : { state-fluent,  bool, default = false };
+                        a : { action-fluent, bool, default = false }; 
+                    };
+                    cpfs { p' = if (~q ^ r) then if (s | (p < 0)) then 2 * p else 0 else -1; };
+                    reward = 0;
+                }
+                non-fluents my_test_empty { domain = my_test; }
+                instance my_test_inst { domain = my_test; init-state { a; }; }
+                '''
+        conv = Converter()
+        conv.convert_str(rddl, AG_NAME)
+        _p = conv.world.getState(AG_NAME, 'p', unique=True)
+        q = conv.world.getState(AG_NAME, 'q', unique=True)
+        r = conv.world.getState(AG_NAME, 'r', unique=True)
+        s = conv.world.getState(AG_NAME, 's', unique=True)
+        self.assertEqual(_p, -1)
+        conv.world.step()
+        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        if not q and r:
+            if s or (p < 0):
+                p_ = 2 * _p
             else:
                 p_ = 0
         else:

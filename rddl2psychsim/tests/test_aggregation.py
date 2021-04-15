@@ -10,7 +10,7 @@ AG_NAME = 'Agent'
 
 class TestAggregation(unittest.TestCase):
 
-    def test_fluent_param_sum(self):
+    def test_fluent_sum(self):
         objs = {'x1': 1, 'x2': 2, 'x3': 3, 'x4': 4}
         rddl = f'''
                 domain my_test {{
@@ -44,7 +44,7 @@ class TestAggregation(unittest.TestCase):
         p = conv.world.getState(AG_NAME, 'p', unique=True)
         self.assertEqual(p, sum(objs.values()))
 
-    def test_fluent_multi_param_sum(self):
+    def test_fluent_multi_sum(self):
         objs = {('x1', 'x1'): 1,
                 ('x1', 'x2'): 2,
                 ('x2', 'x1'): 3,
@@ -83,7 +83,7 @@ class TestAggregation(unittest.TestCase):
         p = conv.world.getState(AG_NAME, 'p', unique=True)
         self.assertEqual(p, sum(objs.values()))
 
-    def test_fluent_multi_param_sum2(self):
+    def test_fluent_multi_sum2(self):
         objs = {('x1', 'y1'): 1,
                 ('x1', 'y2'): 2,
                 ('x2', 'y1'): 3,
@@ -124,7 +124,7 @@ class TestAggregation(unittest.TestCase):
         p = conv.world.getState(AG_NAME, 'p', unique=True)
         self.assertEqual(p, 2 * sum(objs.values()))
 
-    def test_fluent_multi_param_sum3(self):
+    def test_fluent_multi_sum3(self):
         objs1 = {('x1', 'y1'): 1,
                  ('x1', 'y2'): 2,
                  ('x2', 'y1'): 3,
@@ -170,7 +170,7 @@ class TestAggregation(unittest.TestCase):
         p = conv.world.getState(AG_NAME, 'p', unique=True)
         self.assertEqual(p, 2 * sum(objs1[(x, y)] + 2 * objs2[x] for x, y in objs1.keys()))
 
-    def test_non_fluent_param_sum(self):
+    def test_non_fluent_sum(self):
         objs = {'x1': 1, 'x2': 2, 'x3': 3, 'x4': 4}
         rddl = f'''
                 domain my_test {{
@@ -202,7 +202,7 @@ class TestAggregation(unittest.TestCase):
         p = conv.world.getState(AG_NAME, 'p', unique=True)
         self.assertEqual(p, sum(objs.values()))
 
-    def test_non_fluent_multi_param_sum(self):
+    def test_non_fluent_multi_sum(self):
         objs = {('x1', 'x1'): 1,
                 ('x1', 'x2'): 2,
                 ('x2', 'x1'): 3,
@@ -239,7 +239,7 @@ class TestAggregation(unittest.TestCase):
         p = conv.world.getState(AG_NAME, 'p', unique=True)
         self.assertEqual(p, sum(objs.values()))
 
-    def test_non_fluent_multi_param_sum2(self):
+    def test_non_fluent_multi_sum2(self):
         objs = {('x1', 'y1'): 1,
                 ('x1', 'y2'): 2,
                 ('x2', 'y1'): 3,
@@ -278,7 +278,7 @@ class TestAggregation(unittest.TestCase):
         p = conv.world.getState(AG_NAME, 'p', unique=True)
         self.assertEqual(p, 2 * sum(objs.values()))
 
-    def test_invalid_fluent_param_prod(self):
+    def test_invalid_fluent_prod(self):
         objs = {'x1': 1, 'x2': 2, 'x3': 3, 'x4': 4}
         rddl = f'''
                 domain my_test {{
@@ -308,7 +308,7 @@ class TestAggregation(unittest.TestCase):
         with self.assertRaises(AssertionError):
             conv.convert_str(rddl, AG_NAME)
 
-    def test_non_fluent_param_prod(self):
+    def test_non_fluent_prod(self):
         objs = {'x1': 1, 'x2': 2, 'x3': 3, 'x4': 4}
         rddl = f'''
                 domain my_test {{
@@ -340,7 +340,7 @@ class TestAggregation(unittest.TestCase):
         p = conv.world.getState(AG_NAME, 'p', unique=True)
         self.assertEqual(p, np.prod(list(objs.values())))
 
-    def test_non_fluent_multi_param_prod(self):
+    def test_non_fluent_multi_prod(self):
         objs = {('x1', 'y1'): 1,
                 ('x1', 'y2'): 2,
                 ('x2', 'y1'): 3,
@@ -379,7 +379,7 @@ class TestAggregation(unittest.TestCase):
         p = conv.world.getState(AG_NAME, 'p', unique=True)
         self.assertEqual(p, 3 + np.prod(list(objs.values())))
 
-    def test_const_param_prod(self):
+    def test_const_prod(self):
         objs = {'x1': 1, 'x2': 2, 'x3': 3, 'x4': 4}
         rddl = f'''
                 domain my_test {{
@@ -410,3 +410,203 @@ class TestAggregation(unittest.TestCase):
         conv.world.step()
         p = conv.world.getState(AG_NAME, 'p', unique=True)
         self.assertEqual(p, np.power(2, len(objs)))
+
+    def test_fluent_forall_self(self):
+        objs = {'x1': True, 'x2': True, 'x3': True, 'x4': True}
+        rddl = f'''
+                domain my_test {{
+                    types {{ obj : object; }};
+                    pvariables {{ 
+                        p : {{ state-fluent, bool, default = true }};
+                        q(obj) : {{ state-fluent, bool, default = false }};
+                        a : {{ action-fluent, bool, default = false }}; 
+                    }};
+                    cpfs {{ p' = forall_{{?x : obj}}[ p ]; }}; 
+                    reward = 0;
+                }}
+                non-fluents my_test_nf {{ 
+                    domain = my_test; 
+                    objects {{
+                        obj : {{{', '.join(objs.keys())}}};
+                    }};
+                }}
+                instance my_test_inst {{ 
+                    domain = my_test; 
+                    init-state {{
+                        {'; '.join(f'q({o})={v}' for o, v in objs.items())}; 
+                    }}; 
+                }}
+                '''
+        conv = Converter()
+        conv.convert_str(rddl, AG_NAME)
+        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        self.assertEqual(p, True)
+        conv.world.step()
+        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        self.assertEqual(p, True)
+
+    def test_fluent_forall_bool(self):
+        objs = {'x1': True, 'x2': True, 'x3': True, 'x4': True}
+        rddl = f'''
+                domain my_test {{
+                    types {{ obj : object; }};
+                    pvariables {{ 
+                        p : {{ state-fluent, bool, default = false }};
+                        q(obj) : {{ state-fluent, bool, default = false }};
+                        a : {{ action-fluent, bool, default = false }}; 
+                    }};
+                    cpfs {{ p' = forall_{{?x : obj}}[ q(?x) ]; }}; 
+                    reward = 0;
+                }}
+                non-fluents my_test_nf {{ 
+                    domain = my_test; 
+                    objects {{
+                        obj : {{{', '.join(objs.keys())}}};
+                    }};
+                }}
+                instance my_test_inst {{ 
+                    domain = my_test; 
+                    init-state {{
+                        {'; '.join(f'q({o})={v}' for o, v in objs.items())}; 
+                    }}; 
+                }}
+                '''
+        conv = Converter()
+        conv.convert_str(rddl, AG_NAME)
+        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        self.assertEqual(p, False)
+        conv.world.step()
+        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        self.assertEqual(p, all(objs.values()))
+
+    def test_const_forall_true(self):
+        objs = {'x1': False, 'x2': False, 'x3': False, 'x4': False}
+        rddl = f'''
+                domain my_test {{
+                    types {{ obj : object; }};
+                    pvariables {{ 
+                        p : {{ state-fluent, bool, default = false }};
+                        q(obj) : {{ state-fluent, int, default = -1 }};
+                        a : {{ action-fluent, bool, default = false }}; 
+                    }};
+                    cpfs {{ p' = forall_{{?x : obj}}[ true ]; }}; 
+                    reward = 0;
+                }}
+                non-fluents my_test_nf {{ 
+                    domain = my_test; 
+                    objects {{
+                        obj : {{{', '.join(objs.keys())}}};
+                    }};
+                }}
+                instance my_test_inst {{ 
+                    domain = my_test; 
+                    init-state {{
+                        {'; '.join(f'q({o})={v}' for o, v in objs.items())}; 
+                    }}; 
+                }}
+                '''
+        conv = Converter()
+        conv.convert_str(rddl, AG_NAME)
+        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        self.assertEqual(p, False)
+        conv.world.step()
+        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        self.assertEqual(p, True)
+
+    def test_const_forall_false(self):
+        objs = {'x1': False, 'x2': False, 'x3': False, 'x4': False}
+        rddl = f'''
+                domain my_test {{
+                    types {{ obj : object; }};
+                    pvariables {{ 
+                        p : {{ state-fluent, bool, default = true }};
+                        q(obj) : {{ state-fluent, int, default = -1 }};
+                        a : {{ action-fluent, bool, default = false }}; 
+                    }};
+                    cpfs {{ p' = forall_{{?x : obj}}[ false ]; }}; 
+                    reward = 0;
+                }}
+                non-fluents my_test_nf {{ 
+                    domain = my_test; 
+                    objects {{
+                        obj : {{{', '.join(objs.keys())}}};
+                    }};
+                }}
+                instance my_test_inst {{ 
+                    domain = my_test; 
+                    init-state {{
+                        {'; '.join(f'q({o})={v}' for o, v in objs.items())}; 
+                    }}; 
+                }}
+                '''
+        conv = Converter()
+        conv.convert_str(rddl, AG_NAME)
+        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        self.assertEqual(p, True)
+        conv.world.step()
+        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        self.assertEqual(p, False)
+
+    def test_fluent_forall_rel(self):
+        objs = {'x1': 1, 'x2': 2, 'x3': 3, 'x4': 4}
+        rddl = f'''
+                domain my_test {{
+                    types {{ obj : object; }};
+                    pvariables {{ 
+                        p : {{ state-fluent, bool, default = false }};
+                        q(obj) : {{ state-fluent, int, default = -1 }};
+                        a : {{ action-fluent, bool, default = false }}; 
+                    }};
+                    cpfs {{ p' = forall_{{?x : obj}}[ q(?x) >= 1 ]; }}; 
+                    reward = 0;
+                }}
+                non-fluents my_test_nf {{ 
+                    domain = my_test; 
+                    objects {{
+                        obj : {{{', '.join(objs.keys())}}};
+                    }};
+                }}
+                instance my_test_inst {{ 
+                    domain = my_test; 
+                    init-state {{
+                        {'; '.join(f'q({o})={v}' for o, v in objs.items())}; 
+                    }}; 
+                }}
+                '''
+        conv = Converter()
+        conv.convert_str(rddl, AG_NAME)
+        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        self.assertEqual(p, False)
+        conv.world.step()
+        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        self.assertEqual(p, all(q >= 1 for q in objs.values()))
+
+    def test_invalid_fluent_forall_if(self):
+        objs = {'x1': 1, 'x2': 2, 'x3': 3, 'x4': 4}
+        rddl = f'''
+                domain my_test {{
+                    types {{ obj : object; }};
+                    pvariables {{ 
+                        p : {{ state-fluent, bool, default = false }};
+                        q(obj) : {{ state-fluent, int, default = -1 }};
+                        a : {{ action-fluent, bool, default = false }}; 
+                    }};
+                    cpfs {{ p' = forall_{{?x : obj}}[ if (q(?x) > 2) then q(?x) else - q(?x) ]; }}; 
+                    reward = 0;
+                }}
+                non-fluents my_test_nf {{ 
+                    domain = my_test; 
+                    objects {{
+                        obj : {{{', '.join(objs.keys())}}};
+                    }};
+                }}
+                instance my_test_inst {{ 
+                    domain = my_test; 
+                    init-state {{
+                        {'; '.join(f'q({o})={v}' for o, v in objs.items())}; 
+                    }}; 
+                }}
+                '''
+        conv = Converter()
+        with self.assertRaises(ValueError):
+            conv.convert_str(rddl, AG_NAME)

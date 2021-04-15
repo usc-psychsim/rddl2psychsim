@@ -230,7 +230,7 @@ class TestRelational(unittest.TestCase):
         p = conv.world.getState(AG_NAME, 'p', unique=True)
         self.assertEqual(p, True)
 
-    def test_eq_true_pwl(self):
+    def test_eq_true_linear(self):
         rddl = '''
         domain my_test {
             pvariables { 
@@ -674,7 +674,7 @@ class TestRelational(unittest.TestCase):
         p = conv.world.getState(AG_NAME, 'p', unique=True)
         self.assertEqual(p, True)
 
-    def test_geq_true_pwl(self):
+    def test_geq_true_linear(self):
         rddl = '''
         domain my_test {
             pvariables { 
@@ -918,7 +918,7 @@ class TestRelational(unittest.TestCase):
         p = conv.world.getState(AG_NAME, 'p', unique=True)
         self.assertEqual(p, True)
 
-    def test_leq_true_pwl(self):
+    def test_leq_true_linear(self):
         rddl = '''
         domain my_test {
             pvariables { 
