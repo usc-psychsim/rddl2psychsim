@@ -29,9 +29,10 @@ class _ConverterBase(object):
     _poisson_probs: List[float]
 
     def __init__(self):
-        self.fluent_to_feature = {}
+        self.features = {}
         self.constants = {}
         self.actions = {}
+        self._feature_param_types = {}
 
     def log_state(self, features: List[str] = None) -> None:
         """
@@ -40,7 +41,7 @@ class _ConverterBase(object):
         :param List[str] features: the features whose current value are to be printed. `None` will print all
         features on record.
         """
-        for f in self.fluent_to_feature.values():
+        for f in self.features.values():
             if features is None or f in features:
                 val = str(self.world.getFeature(f)).replace('\n', '\t')
                 logging.info(f'{f}: {val}')
@@ -61,10 +62,10 @@ class _ConverterBase(object):
         return str(f)
 
     def _is_feature(self, name: Tuple) -> bool:
-        return self.get_fluent_name(name) in self.fluent_to_feature
+        return self.get_fluent_name(name) in self.features
 
     def _get_feature(self, name: Tuple) -> str:
-        return self.fluent_to_feature[self.get_fluent_name(name)]
+        return self.features[self.get_fluent_name(name)]
 
     def _is_action(self, name: Tuple, agent: Agent) -> bool:
         return agent.name in self.actions and self.get_fluent_name(name) in self.actions[agent.name]
@@ -111,6 +112,11 @@ class _ConverterBase(object):
             return list, domain
 
         raise ValueError(f'Could not get domain for range type: {t_range}!')
+
+    def _get_param_types(self, name: str) -> List[str]:
+        assert name in self._feature_param_types, \
+            f'Could not get param types for fluent: {name}, feature not registered!'
+        return self._feature_param_types[name]
 
     def _get_param_values(self, param_type: str) -> List[str]:
         for p_type, p_vals in self.model.non_fluents.objects:
@@ -179,13 +185,16 @@ class _ConverterBase(object):
         else:
             f_combs = [(fluent.name, None)]  # not-parameterized constant
 
+        # registers types of parameters for this type of feature
+        self._feature_param_types[fluent.name] = fluent.param_types
+
         # create and register features
         feats = []
         domain = self._get_domain(fluent.range)
         for f_name in f_combs:
             f_name = self.get_fluent_name(f_name)
             f = self.world.defineState(agent.name, f_name, *domain)
-            self.fluent_to_feature[f_name] = f
+            self.features[f_name] = f
 
             # set to default value (if list assume first of list)
             lo = self.world.variables[f]['lo']
@@ -202,7 +211,7 @@ class _ConverterBase(object):
     def _convert_variables(self, agent: Agent):
         # create variables from state fluents
         logging.info('__________________________________________________')
-        self.fluent_to_feature = {}
+        self.features = {}
         for sf in self.model.domain.state_fluents.values():
             self._create_features(sf, agent)
 
@@ -214,7 +223,7 @@ class _ConverterBase(object):
         for sf in self.model.domain.observ_fluents.values():
             self._create_features(sf, agent)
 
-        logging.info(f'Total {len(self.fluent_to_feature)} features created')
+        logging.info(f'Total {len(self.features)} features created')
 
     def _convert_actions(self, agent: Agent):
         # create actions for agent

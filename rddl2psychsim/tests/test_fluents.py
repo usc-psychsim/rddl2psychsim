@@ -280,7 +280,7 @@ class TestTypes(unittest.TestCase):
                         p(obj) : {{ state-fluent,  bool, default = true }};
                         a : {{ action-fluent, bool, default = false }}; 
                     }};
-                    cpfs {{ p'(obj) = false; }}; 
+                    cpfs {{ p'(?o) = false; }}; 
                     reward = 0;
                 }}
                 non-fluents my_test_empty {{ 
@@ -310,7 +310,7 @@ class TestTypes(unittest.TestCase):
                         p(obj) : {{ state-fluent,  bool, default = true }};
                         a : {{ action-fluent, bool, default = false }}; 
                     }};
-                    cpfs {{ p'(obj) = false; }}; 
+                    cpfs {{ p'(?o) = false; }}; 
                     reward = 0;
                 }}
                 non-fluents my_test_empty {{ 
@@ -348,7 +348,7 @@ class TestTypes(unittest.TestCase):
                         p(obj, obj) : {{ state-fluent,  bool, default = true }};
                         a : {{ action-fluent, bool, default = false }}; 
                     }};
-                    cpfs {{ p'(obj, obj) = false; }}; 
+                    cpfs {{ p'(?o, ?o) = false; }}; 
                     reward = 0;
                 }}
                 non-fluents my_test_empty {{ 
@@ -389,7 +389,7 @@ class TestTypes(unittest.TestCase):
                         p(x_obj, y_obj) : {{ state-fluent,  bool, default = true }};
                         a : {{ action-fluent, bool, default = false }}; 
                     }};
-                    cpfs {{ p'(x_obj, y_obj) = false; }}; 
+                    cpfs {{ p'(?x, ?y) = false; }}; 
                     reward = 0;
                 }}
                 non-fluents my_test_empty {{ 
@@ -415,6 +415,90 @@ class TestTypes(unittest.TestCase):
         for o, v in objs.items():
             p = conv.world.getState(AG_NAME, Converter.get_fluent_name(('p', *o)), unique=True)
             self.assertEqual(p, False)
+
+    def test_fluent_multi_param_dyn_self(self):
+        objs = {('x1', 'x1'): True,
+                ('x1', 'x2'): False,
+                ('x2', 'x1'): False,
+                ('x2', 'x2'): True}
+        rddl = f'''
+                domain my_test {{
+                    types {{ obj : object; }};
+                    pvariables {{ 
+                        p(obj, obj) : {{ state-fluent,  bool, default = true }};
+                        a : {{ action-fluent, bool, default = false }}; 
+                    }};
+                    cpfs {{ p'(?o1, ?o2) = p(?o1, ?o2); }}; 
+                    reward = 0;
+                }}
+                non-fluents my_test_empty {{ 
+                    domain = my_test;
+                    objects {{
+                        obj : {{{', '.join({x for x, _ in objs.keys()})}}};
+                    }}; 
+                }}
+                instance my_test_inst {{ 
+                    domain = my_test; 
+                    init-state {{
+                        {'; '.join(f'p({",".join(o)}) = {str(v).lower()}' for o, v in objs.items())};
+                    }}; 
+                }}
+                '''
+        conv = Converter()
+        conv.convert_str(rddl, AG_NAME)
+        for o, v in objs.items():
+            p = conv.world.getState(AG_NAME, Converter.get_fluent_name(('p', *o)), unique=True)
+            self.assertEqual(p, v)
+        conv.world.step()
+        for o, v in objs.items():
+            p = conv.world.getState(AG_NAME, Converter.get_fluent_name(('p', *o)), unique=True)
+            self.assertEqual(p, v)
+
+    def test_fluent_multi_param_dyn_const(self):
+        objs = {('x1', 'x1'): True,
+                ('x1', 'x2'): False,
+                ('x2', 'x1'): False,
+                ('x2', 'x2'): True}
+        consts = {('x1', 'x1'): 1,
+                  ('x1', 'x2'): 2,
+                  ('x2', 'x1'): 3,
+                  ('x2', 'x2'): 4}
+        rddl = f'''
+                domain my_test {{
+                    types {{ obj : object; }};
+                    pvariables {{ 
+                        C(obj, obj) : {{ non-fluent, int, default = -1}};
+                        p(obj, obj) : {{ state-fluent,  bool, default = true }};
+                        a : {{ action-fluent, bool, default = false }}; 
+                    }};
+                    cpfs {{ p'(?o1, ?o2) = p(?o1, ?o2) ^ (C(?o1, ?o2) >= 1); }}; 
+                    reward = 0;
+                }}
+                non-fluents my_test_empty {{ 
+                    domain = my_test;
+                    non-fluents {{
+                        {'; '.join(f'C({",".join(o)}) = {v}' for o, v in consts.items())};
+                    }};
+                    objects {{
+                        obj : {{{', '.join({x for x, _ in objs.keys()})}}};
+                    }}; 
+                }}
+                instance my_test_inst {{ 
+                    domain = my_test; 
+                    init-state {{
+                        {'; '.join(f'p({",".join(o)}) = {str(v).lower()}' for o, v in objs.items())};
+                    }}; 
+                }}
+                '''
+        conv = Converter()
+        conv.convert_str(rddl, AG_NAME)
+        for o, v in objs.items():
+            p = conv.world.getState(AG_NAME, Converter.get_fluent_name(('p', *o)), unique=True)
+            self.assertEqual(p, v)
+        conv.world.step()
+        for o, v in objs.items():
+            p = conv.world.getState(AG_NAME, Converter.get_fluent_name(('p', *o)), unique=True)
+            self.assertEqual(p, v and (consts[o] >= 1))
 
     def test_non_fluent_param_def(self):
         objs = {'x1': 1, 'x2': 2, 'x3': 3, 'x4': 4}
@@ -574,3 +658,5 @@ class TestTypes(unittest.TestCase):
         self.assertEqual(p, 4)
         q = conv.world.getState(AG_NAME, 'q', unique=True)
         self.assertEqual(q, 3)
+
+    # TODO test use of parameterized fluents and param Constants in dynamics expressions of param fluents!

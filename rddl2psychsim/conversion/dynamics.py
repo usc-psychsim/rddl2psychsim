@@ -24,19 +24,21 @@ class _DynamicsConverter(_ExpressionConverter):
             if f_type == 'pvar_expr':
                 name = cpf.pvar[1][0].replace('\'', '')
                 if cpf.pvar[1][1] is None:
-                    f_combs = [(name, None)]
+                    params = []
+                    param_vals = [(None,)]
                 else:
                     # gets all combinations for features
-                    param_types = [param_type[1][0] for param_type in cpf.pvar[1][1]]
+                    params = [p for p in cpf.pvar[1][1]]
+                    param_types = self._get_param_types(name)
                     param_vals = self._get_all_param_combs(param_types)
-                    f_combs = [(name, *p_vals) for p_vals in param_vals]
 
                 # sets dynamics for each feature
-                for f_comb in f_combs:
-                    if not self._is_feature(f_comb):
-                        raise ValueError(f'Could not find feature for fluent "{f_comb}" in CPF "{cpf}"!')
-                    f = self._get_feature(f_comb)
-                    tree = self._create_dynamics_tree(f, cpf.expr, agent)
+                for p_vals in param_vals:
+                    f_name = (name, *p_vals)
+                    if not self._is_feature(f_name):
+                        raise ValueError(f'Could not find feature for fluent "{f_name}" in CPF "{cpf}"!')
+                    f = self._get_feature(f_name)
+                    tree = self._create_dynamics_tree(f, cpf.expr, agent, dict(zip(params, p_vals)))
                     self.world.setDynamics(f, True, tree)
                     logging.info(f'Set dynamics for feature "{f}" to:\n{tree}')
             else:
@@ -49,8 +51,9 @@ class _DynamicsConverter(_ExpressionConverter):
         agent.setReward(tree, 1.)
         logging.info(f'Set agent "{agent.name}" reward to:\n{tree}')
 
-    def _create_dynamics_tree(self, key: str, expression: Expression, agent: Agent) -> KeyedTree:
-        return makeTree(self._get_dynamics_tree(key, self._convert_expression(expression, agent)))
+    def _create_dynamics_tree(self, key: str, expression: Expression, agent: Agent,
+                              param_map: Dict[str, str] = None) -> KeyedTree:
+        return makeTree(self._get_dynamics_tree(key, self._convert_expression(expression, agent, param_map)))
 
     def _get_dynamics_tree(self, key: str, expr: Dict) -> KeyedMatrix or Dict:
 

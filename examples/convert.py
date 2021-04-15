@@ -1,6 +1,7 @@
 import os
 import argparse
 import logging
+from tqdm import tqdm
 from rddl2psychsim.conversion.converter import Converter
 
 __author__ = 'Pedro Sequeira'
@@ -30,8 +31,8 @@ if __name__ == '__main__':
     logging.info('==================================================')
     logging.info('Starting simulation...')
     conv.log_state()
-    for i in range(args.steps):
-        logging.info('__________________________________________________')
+    for i in tqdm(range(args.steps),):
+        logging.info('\n__________________________________________________')
         logging.info(f'Step {i}:')
         conv.world.step(threshold=0.01)
         conv.log_state()
