@@ -112,103 +112,107 @@ class _ExpressionConverter(_ConverterBase):
 
         raise ValueError(f'Cannot parse expression, invalid relational operation between {lhs} and {rhs}!')
 
-    def _get_nested_if(self, c: Dict, tb: Dict, fb: Dict, expression: Expression = None, agent: Agent = None) -> Dict:
-        if 'pwl_and' in c and len(c) == 1:
-            c = c['pwl_and']
-            return {'if': (c, len([v for v in c.values() if v > 0]) - 0.5, 1),  # AND of features
-                    True: tb,
-                    False: fb}
+    def _get_nested_if(self, comp: Dict, true_branch: Dict, false_branch: Dict,
+                       expression: Expression = None, agent: Agent = None) -> Dict:
+        if 'linear_and' in comp and len(comp) == 1:
+            comp = comp['linear_and']  # AND of features (sum > w_sum - 0.5), see psychsim.world.World.float2value
+            return {'if': (comp, sum([v for v in comp.values() if v > 0]) - 0.5, 1),
+                    True: true_branch,
+                    False: false_branch}
 
-        if 'logic_and' in c and len(c) == 1:
-            lhs, rhs = c['logic_and']  # composes nested AND tree
+        if 'logic_and' in comp and len(comp) == 1:
+            lhs, rhs = comp['logic_and']  # composes nested AND tree
             return {'if': lhs,
-                    True: self._get_nested_if(rhs, tb, fb, expression, agent),
-                    False: fb}
+                    True: self._get_nested_if(rhs, true_branch, false_branch, expression, agent),
+                    False: false_branch}
 
-        if 'pwl_or' in c and len(c) == 1:
-            c = c['pwl_or']
-            return {'if': (c, 0.5, 1),  # OR of features (only 1 needs to be true)
-                    True: tb,
-                    False: fb}
+        if 'linear_or' in comp and len(comp) == 1:
+            comp = comp['linear_or']  # OR of features (A | B) <=> ~(~A ^ ~B)
+            return self._get_nested_if({'linear_and': _negate_linear_function(comp)},
+                                       false_branch,  # switch branches
+                                       true_branch)
 
-        if 'logic_or' in c and len(c) == 1:
-            lhs, rhs = c['logic_or']  # composes nested OR tree
+        if 'logic_or' in comp and len(comp) == 1:
+            lhs, rhs = comp['logic_or']  # composes nested OR tree
             return {'if': lhs,
-                    True: tb,
-                    False: self._get_nested_if(rhs, tb, fb, expression, agent)}
+                    True: true_branch,
+                    False: self._get_nested_if(rhs, true_branch, false_branch, expression, agent)}
 
-        if 'not' in c and len(c) == 1:
-            return self._get_nested_if(c['not'], fb, tb, expression, agent)  # if NOT, just flip branches
+        if 'not' in comp and len(comp) == 1:
+            # if NOT, just flip branches
+            return self._get_nested_if(comp['not'], false_branch, true_branch, expression, agent)
 
-        if 'equiv' in c:
-            lhs, rhs = c['equiv']
+        if 'equiv' in comp:
+            lhs, rhs = comp['equiv']
             lhs = _combine_linear_functions(lhs, _negate_linear_function(rhs))
             return {'if': (lhs, 0, 0),  # takes equality of pwl comb in vectors (difference==0)
-                    True: tb,
-                    False: fb}
+                    True: true_branch,
+                    False: false_branch}
 
-        if 'imply' in c:
+        if 'imply' in comp:
             # if IMPLICATION, false only if left is true and right is false
-            lhs, rhs = c['imply']
+            lhs, rhs = comp['imply']
             return {'if': (lhs, 0.5, 1),  # if left is true (> 0.5)
                     True: {'if': (rhs, 0.5, 1),  # if right is true (> 0.5)
-                           True: tb,
-                           False: fb},
-                    False: tb}
+                           True: true_branch,
+                           False: false_branch},
+                    False: true_branch}
 
-        if 'eq' in c:
-            lhs, rhs = c['eq']
+        if 'eq' in comp:
+            lhs, rhs = comp['eq']
             op, thresh = self._get_relational_plane_thresh(lhs, rhs)
             return {'if': (op, thresh, 0),  # takes equality of pwl comb in vectors (difference==0)
-                    True: tb,
-                    False: fb}
+                    True: true_branch,
+                    False: false_branch}
 
-        if 'neq' in c:
-            lhs, rhs = c['neq']
+        if 'neq' in comp:
+            lhs, rhs = comp['neq']
             op, thresh = self._get_relational_plane_thresh(lhs, rhs)
             return {'if': (op, thresh, 0),  # takes equality of pwl comb in vectors (difference==0)
-                    True: fb,  # then switch branches
-                    False: tb}
+                    True: false_branch,  # then switch branches
+                    False: true_branch}
 
-        if 'gt' in c:
-            lhs, rhs = c['gt']
+        if 'gt' in comp:
+            lhs, rhs = comp['gt']
             op, thresh = self._get_relational_plane_thresh(lhs, rhs)
             return {'if': (op, thresh, 1),  # takes diff of pwl comb in vectors (difference>0)
-                    True: tb,
-                    False: fb}
+                    True: true_branch,
+                    False: false_branch}
 
-        if 'lt' in c:
-            lhs, rhs = c['lt']
+        if 'lt' in comp:
+            lhs, rhs = comp['lt']
             op, thresh = self._get_relational_plane_thresh(lhs, rhs)
             return {'if': (op, thresh, -1),  # takes diff of pwl comb in vectors (difference<0)
-                    True: tb,
-                    False: fb}
+                    True: true_branch,
+                    False: false_branch}
 
-        if 'geq' in c:
-            lhs, rhs = c['geq']
+        if 'geq' in comp:
+            lhs, rhs = comp['geq']
             op, thresh = self._get_relational_plane_thresh(lhs, rhs)
             return {'if': (op, thresh, -1),  # takes diff of pwl comb in vectors (difference<0)
-                    True: fb,  # then switch branches
-                    False: tb}
+                    True: false_branch,  # then switch branches
+                    False: true_branch}
 
-        if 'leq' in c:
-            lhs, rhs = c['leq']
+        if 'leq' in comp:
+            lhs, rhs = comp['leq']
             op, thresh = self._get_relational_plane_thresh(lhs, rhs)
             return {'if': (op, thresh, 1),  # takes diff of pwl comb in vectors (difference>0)
-                    True: fb,  # then switch branches
-                    False: tb}
+                    True: false_branch,  # then switch branches
+                    False: true_branch}
 
-        if 'action' in c and len(c) == 1 and agent is not None:
-            return {'if': ({actionKey(agent.name): 1.}, c['action'], 0),  # conditional on specific agent's action
-                    True: tb,
-                    False: fb}
+        if 'action' in comp and len(comp) == 1 and agent is not None:
+            return {'if': ({actionKey(agent.name): 1.}, comp['action'], 0),  # conditional on specific agent's action
+                    True: true_branch,
+                    False: false_branch}
 
-        if _is_linear_function(c):
-            return {'if': (c, 0, 1),  # default: assumes linear combination of all features in vector has to be > 0
-                    True: tb,
-                    False: fb}
+        if _is_linear_function(comp):
+            # default: assumes linear combination of all features in vector has to be > 0.5,
+            # which is truth value in PsychSim (see psychsim.world.World.float2value)
+            return {'if': (comp, 0.5, 1),
+                    True: true_branch,
+                    False: false_branch}
 
-        raise ValueError(f'Could not parse RDDL expression "{expression}", invalid nested PWL control in "{c}"!')
+        raise ValueError(f'Could not parse RDDL expression "{expression}", invalid nested PWL control in "{comp}"!')
 
     def _get_param_mappings(self, expression: Expression) -> List[Dict[str, str]]:
         # get mappings in the form param -> param type value for each param combination
@@ -344,15 +348,19 @@ class _ExpressionConverter(_ConverterBase):
             if isinstance(lhs_const, float):
                 return rhs if bool(lhs_const) else {CONSTANT: False}
             orig_lhs = lhs
-            if 'pwl_and' in lhs and len(lhs) == 1:
-                lhs = lhs['pwl_and']
+            if 'linear_and' in lhs and len(lhs) == 1:
+                lhs = lhs['linear_and']  # tries to combine several AND together
+            elif 'not' in lhs and len(lhs) == 1 and _is_linear_function(lhs['not']):
+                lhs = _negate_linear_function(lhs['not'])  # tries to combine AND with NOT
             orig_rhs = rhs
-            if 'pwl_and' in rhs and len(rhs) == 1:
-                rhs = rhs['pwl_and']
+            if 'linear_and' in rhs and len(rhs) == 1:
+                rhs = rhs['linear_and']  # tries to combine several AND together
+            elif 'not' in rhs and len(rhs) == 1 and _is_linear_function(rhs['not']):
+                rhs = _negate_linear_function(rhs['not'])  # tries to combine AND with NOT
             if _is_linear_function(lhs) and _is_linear_function(rhs):
                 # if both linear ops, just add everything from both sides (thresh >= len)
-                return {'pwl_and': _combine_linear_functions(lhs, rhs)}
-            return {'logic_and': (orig_lhs, orig_rhs)}  # defer for later processing
+                return {'linear_and': _combine_linear_functions(lhs, rhs)}
+            return {'logic_and': (orig_lhs, orig_rhs)}  # AND tree
 
         if b_type == '|':
             # if OR, one side has to be True
@@ -363,15 +371,19 @@ class _ExpressionConverter(_ConverterBase):
             if isinstance(lhs_const, float):
                 return {CONSTANT: True} if bool(lhs_const) else rhs
             orig_lhs = lhs
-            if 'pwl_or' in lhs and len(lhs) == 1:
-                lhs = lhs['pwl_or']
+            if 'linear_or' in lhs and len(lhs) == 1:
+                lhs = lhs['linear_or']  # tries to combine several OR together
+            elif 'not' in lhs and len(lhs) == 1 and _is_linear_function(lhs['not']):
+                lhs = _negate_linear_function(lhs['not'])  # tries to combine OR with NOT
             orig_rhs = rhs
-            if 'pwl_or' in rhs and len(rhs) == 1:
-                rhs = rhs['pwl_or']
+            if 'linear_or' in rhs and len(rhs) == 1:
+                rhs = rhs['linear_or']  # tries to combine several OR together
+            elif 'not' in rhs and len(rhs) == 1 and _is_linear_function(rhs['not']):
+                rhs = _negate_linear_function(rhs['not'])  # tries to combine OR with NOT
             if _is_linear_function(lhs) and _is_linear_function(rhs):
                 # if both vectors, just add everything from both sides (thresh > 0)
-                return {'pwl_or': _combine_linear_functions(lhs, rhs)}
-            return {'logic_or': (orig_lhs, orig_rhs)}  # defer for later processing
+                return {'linear_or': _combine_linear_functions(lhs, rhs)}
+            return {'logic_or': (orig_lhs, orig_rhs)}  # OR tree
 
         if b_type == '~':
             # NOT
@@ -379,6 +391,10 @@ class _ExpressionConverter(_ConverterBase):
                 return {CONSTANT: False if bool(lhs_const) else True}  # gets constant's truth value
             if 'not' in lhs and len(lhs) == 1:
                 return lhs['not']  # double negation
+            if 'linear_and' in lhs and len(lhs) == 1:  # ~(A ^ B) <=> ~A | ~B
+                return {'linear_or': _negate_linear_function(lhs['linear_and'])}
+            if 'linear_or' in lhs and len(lhs) == 1:  # ~(A | B) <=> ~A ^ ~B
+                return {'linear_and': _negate_linear_function(lhs['linear_or'])}
             return {'not': lhs}  # defer for later processing
 
         if b_type == '<=>':
@@ -637,6 +653,8 @@ class _ExpressionConverter(_ConverterBase):
 
     def _convert_aggregation_expr(self, expression: Expression, agent: Agent, param_map: Dict[str, str] = None) -> Dict:
         d_type = expression.etype[1]
+        if param_map is None:
+            param_map = {}
 
         if d_type == 'sum':
             assert all(len(arg) == 2 and arg[0] == 'typed_var' for arg in expression.args[:-1]), \
@@ -645,10 +663,10 @@ class _ExpressionConverter(_ConverterBase):
             # combine linear functions resulting from param substitutions in sub-expressions
             param_maps = self._get_param_mappings(expression)
             lf = {}
-            for param_map in param_maps:
-                expr = self._convert_expression(expression.args[-1], agent, param_map)
+            for p_map in param_maps:
+                expr = self._convert_expression(expression.args[-1], agent, {**param_map, **p_map})
                 lf = _combine_linear_functions(lf, expr)  # sum linear functions
-            return lf
+            return {CONSTANT: 0} if len(lf) == 0 else lf
 
         if d_type == 'prod':
             assert all(len(arg) == 2 and arg[0] == 'typed_var' for arg in expression.args[:-1]), \
@@ -657,12 +675,35 @@ class _ExpressionConverter(_ConverterBase):
             # then combine linear functions resulting from param substitutions in sub-expressions
             param_maps = self._get_param_mappings(expression)
             lf = {CONSTANT: 1.}
-            for param_map in param_maps:
-                expr = self._convert_expression(expression.args[-1], agent, param_map)
+            for p_map in param_maps:
+                expr = self._convert_expression(expression.args[-1], agent, {**param_map, **p_map})
                 const_val = _get_const_val(expr)
                 assert const_val is not None, \
                     f'Cannot parse aggregation: "{expression}", non-constant expression: "{expr}"!'
                 lf = _scale_linear_function(lf, const_val)  # product of constant values
+            return {CONSTANT: 0} if len(lf) == 0 else lf
+
+        if d_type == 'forall':
+            assert all(len(arg) == 2 and arg[0] == 'typed_var' for arg in expression.args[:-1]), \
+                f'Cannot parse aggregation expression: "{expression}", invalid quantification arguments!'
+
+            # combine param substitutions in sub-expressions
+            param_maps = self._get_param_mappings(expression)
+            sub_exprs = []
+            for p_map in param_maps:
+                sub_exprs.append(self._convert_expression(expression.args[-1], agent, {**param_map, **p_map}))
+
+            # if all linear ops, just add everything (thresh >= len)
+            if all(_is_linear_function(expr) for expr in sub_exprs):
+                lf = {}
+                for expr in sub_exprs:
+                    lf = _combine_linear_functions(lf, expr)  # sum linear functions
+                return {'linear_and': {CONSTANT: 0} if len(lf) == 0 else lf}
+
+            # otherwise build nested AND tree
+            lf = sub_exprs[0]
+            for expr in sub_exprs[1:]:
+                lf = {'logic_and': (lf, expr)}  # AND tree
             return lf
 
         raise NotImplementedError(f'Cannot parse aggregation expression: "{expression}" of type "{d_type}"!')

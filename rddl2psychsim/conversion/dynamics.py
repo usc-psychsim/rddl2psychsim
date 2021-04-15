@@ -3,9 +3,9 @@ from typing import Dict
 from pyrddl.expr import Expression
 from psychsim.agent import Agent
 from psychsim.pwl import KeyedVector, rewardKey, makeTree, makeFuture, KeyedMatrix, KeyedTree, KeyedPlane, \
-    setToConstantMatrix, CONSTANT, noChangeMatrix
+    CONSTANT, noChangeMatrix
 from rddl2psychsim.conversion.expression import _ExpressionConverter, _is_linear_function, _combine_linear_functions, \
-    _negate_linear_function
+    _negate_linear_function, _get_const_val
 
 __author__ = 'Pedro Sequeira'
 __email__ = 'pedrodbs@gmail.com'
@@ -55,12 +55,19 @@ class _DynamicsConverter(_ExpressionConverter):
     def _get_dynamics_tree(self, key: str, expr: Dict) -> KeyedMatrix or Dict:
 
         # just get the truth value of logical expressions
-        if len(expr) == 1 and next(iter(expr.keys())) in \
-                {'pwl_and', 'logic_and', 'pwl_or', 'logic_or', 'not', 'equiv', 'imply',
+        op = next(iter(expr.keys()))
+        if len(expr) == 1 and op in \
+                {'linear_and', 'logic_and', 'linear_or', 'logic_or', 'not', 'equiv', 'imply',
                  'eq', 'neq', 'gt', 'lt', 'geq', 'leq'}:
+            if _get_const_val(expr[op]) is not None:
+                return self._get_dynamics_tree(key, expr[op])  # no need for tree if it's a constant value
             return self._get_dynamics_tree(key, self._get_nested_if(expr, {CONSTANT: True}, {CONSTANT: False}))
 
         if 'if' in expr and len(expr) == 3:
+            # check if no comparison provided, expression's truth value has to be resolved
+            if len(expr['if']) == 1:
+                return self._get_dynamics_tree(key, self._get_nested_if(expr['if'], expr[True], expr[False]))
+
             # build if-then-else tree
             weights, threshold, comp = expr['if']
             return {'if': KeyedPlane(KeyedVector(weights), threshold, comp),
@@ -92,7 +99,7 @@ class _DynamicsConverter(_ExpressionConverter):
                 if False in tree:
                     tree = tree[False]  # nest if
                 c = _combine_linear_functions(cond, _negate_linear_function(val))  # gets difference between planes
-                tree['if'] = KeyedPlane(KeyedVector(c), 0, 0)  # tests PWL equality
+                tree['if'] = KeyedPlane(KeyedVector(c), 0, 0)  # tests equality
                 tree[True] = self._get_dynamics_tree(key, if_branches[i])
                 tree[False] = {}
 
@@ -121,6 +128,6 @@ class _DynamicsConverter(_ExpressionConverter):
 
         # if all key-value pairs, assume direct linear combination of all features
         if _is_linear_function(expr) or self._is_enum_expr(expr):
-            return KeyedMatrix({makeFuture(key): KeyedVector(expr)})
+            return KeyedMatrix({makeFuture(key): KeyedVector({CONSTANT: 0} if len(expr) == 0 else expr)})
 
         raise NotImplementedError(f'Could not parse RDDL expression, got invalid tree: "{expr}"!')

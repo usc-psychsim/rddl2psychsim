@@ -178,10 +178,10 @@ class _ConverterBase(object):
             f_combs = [(fluent.name, *p_vals) for p_vals in param_vals]
         else:
             f_combs = [(fluent.name, None)]  # not-parameterized constant
-        domain = self._get_domain(fluent.range)
 
         # create and register features
         feats = []
+        domain = self._get_domain(fluent.range)
         for f_name in f_combs:
             f_name = self.get_fluent_name(f_name)
             f = self.world.defineState(agent.name, f_name, *domain)
