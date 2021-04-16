@@ -471,7 +471,7 @@ class TestTypes(unittest.TestCase):
                         p(obj, obj) : {{ state-fluent,  bool, default = true }};
                         a : {{ action-fluent, bool, default = false }}; 
                     }};
-                    cpfs {{ p'(?o1, ?o2) = p(?o1, ?o2) ^ (C(?o1, ?o2) >= 1); }}; 
+                    cpfs {{ p'(?o1, ?o2) = (C(?o1, ?o2) >= 1) ^ p(?o1, ?o2); }}; 
                     reward = 0;
                 }}
                 non-fluents my_test_empty {{ 

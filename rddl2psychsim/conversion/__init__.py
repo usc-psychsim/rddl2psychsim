@@ -5,6 +5,7 @@ import scipy.stats as stats
 from typing import List, Tuple
 from pyrddl.pvariable import PVariable
 from pyrddl.rddl import RDDL
+from psychsim.action import ActionSet
 from psychsim.agent import Agent
 from psychsim.pwl import actionKey
 from psychsim.world import World
@@ -173,9 +174,26 @@ class _ConverterBase(object):
                 if nf_name not in self.constants:
                     raise ValueError(f'Trying to initialize non-existing non-fluent: {nf_name}!')
                 self.constants[nf_name] = val
-                logging.info(f'Initialized constant "{nf}" with value "{val}"')
+                logging.info(f'Initialized constant "{nf_name}" with value "{val}"')
 
         logging.info(f'Total {len(self.constants)} constants initialized')
+
+    def _convert_variables(self, agent: Agent):
+        # create variables from state fluents
+        logging.info('__________________________________________________')
+        self.features = {}
+        for sf in self.model.domain.state_fluents.values():
+            self._create_features(sf, agent)
+
+        # create variables from intermediate fluents
+        for sf in self.model.domain.intermediate_fluents.values():
+            self._create_features(sf, agent)
+
+        # create variables from non-observable fluents
+        for sf in self.model.domain.observ_fluents.values():
+            self._create_features(sf, agent)
+
+        logging.info(f'Total {len(self.features)} features created')
 
     def _create_features(self, fluent: PVariable, agent: Agent) -> List[str]:
         if fluent.arity > 0:
@@ -183,7 +201,7 @@ class _ConverterBase(object):
             param_vals = self._get_all_param_combs(fluent.param_types)
             f_combs = [(fluent.name, *p_vals) for p_vals in param_vals]
         else:
-            f_combs = [(fluent.name, None)]  # not-parameterized constant
+            f_combs = [(fluent.name, None)]  # not-parameterized feature
 
         # registers types of parameters for this type of feature
         self._feature_param_types[fluent.name] = fluent.param_types
@@ -208,33 +226,32 @@ class _ConverterBase(object):
             feats.append(f)
         return feats
 
-    def _convert_variables(self, agent: Agent):
-        # create variables from state fluents
-        logging.info('__________________________________________________')
-        self.features = {}
-        for sf in self.model.domain.state_fluents.values():
-            self._create_features(sf, agent)
-
-        # create variables from intermediate fluents
-        for sf in self.model.domain.intermediate_fluents.values():
-            self._create_features(sf, agent)
-
-        # create variables from non-observable fluents
-        for sf in self.model.domain.observ_fluents.values():
-            self._create_features(sf, agent)
-
-        logging.info(f'Total {len(self.features)} features created')
-
     def _convert_actions(self, agent: Agent):
         # create actions for agent
         logging.info('__________________________________________________')
         self.actions = {agent.name: {}}
-        for act in self.model.domain.action_fluents.values():
-            action = agent.addAction({'verb': act.name})
-            self.actions[agent.name][act.name] = action
-            logging.info(f'Created action "{action}" from action fluent: {act}')
+        for act_fluent in self.model.domain.action_fluents.values():
+            self._create_actions(act_fluent, agent)
 
         logging.info(f'Total {len(self.actions[agent.name])} actions created for agent "{agent.name}"')
+
+    def _create_actions(self, fluent: PVariable, agent: Agent) -> List[ActionSet]:
+        if fluent.arity > 0:
+            # gets all parameter combinations
+            param_vals = self._get_all_param_combs(fluent.param_types)
+            act_combs = [(fluent.name, *p_vals) for p_vals in param_vals]
+        else:
+            act_combs = [(fluent.name, None)]  # not-parameterized action
+
+        # create action for each param combination
+        actions = []
+        for act_name in act_combs:
+            act_name = self.get_fluent_name(act_name)
+            action = agent.addAction({'verb': act_name})
+            actions.append(action)
+            self.actions[agent.name][act_name] = action
+            logging.info(f'Created action "{action}" from action fluent: {fluent}')
+        return actions
 
     def _initialize_variables(self, agent: Agent):
         # initialize variables from instance def
