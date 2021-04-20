@@ -7,7 +7,7 @@ from pyrddl.pvariable import PVariable
 from pyrddl.rddl import RDDL
 from psychsim.action import ActionSet
 from psychsim.agent import Agent
-from psychsim.pwl import actionKey
+from psychsim.pwl import actionKey, WORLD
 from psychsim.world import World
 
 __author__ = 'Pedro Sequeira'
@@ -129,26 +129,28 @@ class _ConverterBase(object):
         param_vals = [self._get_param_values(p_type) for p_type in param_types]
         return list(itertools.product(*param_vals))
 
-    def _create_world_agents(self, agent_name: str):
-        # create world and agent #TODO read agent(s) name(s) from RDDL?
+    def _create_world_agents(self) -> None:
+        # create world
         logging.info('__________________________________________________')
         self.world = World()
 
-        # create agent and set properties from instance
-        agent = self.world.addAgent(agent_name)
-        if hasattr(self.model.instance, 'horizon'):
-            agent.setAttribute('horizon', self.model.instance.horizon)
-        if hasattr(self.model.instance, 'discount'):
-            agent.setAttribute('discount', self.model.instance.discount)
+        # create agents #TODO read agent(s) name(s) from RDDL? hardcoded for now
+        self.world.addAgent('AGENT')
 
-        # TODO other world and agent attributes
-        agent.setAttribute('selection', 'random')
+        # set agents' properties from instance
+        for agent in self.world.agents.values():
+            if hasattr(self.model.instance, 'horizon'):
+                agent.setAttribute('horizon', self.model.instance.horizon)
+            if hasattr(self.model.instance, 'discount'):
+                agent.setAttribute('discount', self.model.instance.discount)
 
-        model = agent.get_true_model()
-        logging.info(f'Created agent "{agent.name}" with properties:')
-        logging.info(f'\thorizon: {agent.getAttribute("horizon", model)}')
-        logging.info(f'\tdiscount: {agent.getAttribute("discount", model)}')
-        return agent
+            # TODO other world and agent attributes
+            agent.setAttribute('selection', 'random')
+
+            model = agent.get_true_model()
+            logging.info(f'Created agent "{agent.name}" with properties:')
+            logging.info(f'\thorizon: {agent.getAttribute("horizon", model)}')
+            logging.info(f'\tdiscount: {agent.getAttribute("discount", model)}')
 
     def _convert_constants(self):
         # first try to initialize non-fluents from definition's default value
@@ -178,7 +180,7 @@ class _ConverterBase(object):
 
         logging.info(f'Total {len(self.constants)} constants initialized')
 
-    def _convert_variables(self, agent: Agent):
+    def _convert_variables(self, agent: Agent = None):
         # create variables from state fluents
         logging.info('__________________________________________________')
         self.features = {}
@@ -195,7 +197,7 @@ class _ConverterBase(object):
 
         logging.info(f'Total {len(self.features)} features created')
 
-    def _create_features(self, fluent: PVariable, agent: Agent) -> List[str]:
+    def _create_features(self, fluent: PVariable, agent: Agent = None) -> List[str]:
         if fluent.arity > 0:
             # gets all parameter combinations
             param_vals = self._get_all_param_combs(fluent.param_types)
@@ -209,9 +211,10 @@ class _ConverterBase(object):
         # create and register features
         feats = []
         domain = self._get_domain(fluent.range)
+        entity = WORLD if agent is None else agent.name
         for f_name in f_combs:
             f_name = self.get_fluent_name(f_name)
-            f = self.world.defineState(agent.name, f_name, *domain)
+            f = self.world.defineState(entity, f_name, *domain)
             self.features[f_name] = f
 
             # set to default value (if list assume first of list)
@@ -226,14 +229,14 @@ class _ConverterBase(object):
             feats.append(f)
         return feats
 
-    def _convert_actions(self, agent: Agent):
-        # create actions for agent
+    def _convert_actions(self):
+        # create actions for agents # TODO assume homogeneous agents (maybe put some constraint in RDDL for diff agents)
         logging.info('__________________________________________________')
-        self.actions = {agent.name: {}}
-        for act_fluent in self.model.domain.action_fluents.values():
-            self._create_actions(act_fluent, agent)
-
-        logging.info(f'Total {len(self.actions[agent.name])} actions created for agent "{agent.name}"')
+        for agent in self.world.agents.values():
+            self.actions = {agent.name: {}}
+            for act_fluent in self.model.domain.action_fluents.values():
+                self._create_actions(act_fluent, agent)
+            logging.info(f'Total {len(self.actions[agent.name])} actions created for agent "{agent.name}"')
 
     def _create_actions(self, fluent: PVariable, agent: Agent) -> List[ActionSet]:
         if fluent.arity > 0:
@@ -253,12 +256,12 @@ class _ConverterBase(object):
             logging.info(f'Created action "{action}" from action fluent: {fluent}')
         return actions
 
-    def _initialize_variables(self, agent: Agent):
+    def _initialize_variables(self):
         # initialize variables from instance def
         logging.info('__________________________________________________')
         for sf, val in self.model.instance.init_state:
             f_name = sf if sf[1] is None else (sf[0], *sf[1])
-            if self._is_action(f_name, agent):
+            if any(self._is_action(f_name, agent) for agent in self.world.agents.values()):
                 continue  # skip action initialization
             assert self._is_feature(f_name), f'Could not find feature "{f_name}" corresponding to fluent "{sf}"!'
             f = self._get_feature(f_name)
@@ -267,7 +270,7 @@ class _ConverterBase(object):
             self.world.setFeature(f, val)
             logging.info(f'Initialized feature "{f}" with value "{val}"')
 
-    def _parse_requirements_pre(self, agent: Agent):
+    def _parse_requirements_pre(self):
         logging.info('__________________________________________________')
 
         # get Normal distribution discretization params
@@ -300,17 +303,19 @@ class _ConverterBase(object):
             self._poisson_exp_rate = POISSON_EXP_RATE
         logging.info(f'Using {self._poisson_exp_rate} as the expected rate of Poisson distributions')
 
-    def _parse_requirements_post(self, agent: Agent):
+    def _parse_requirements_post(self):
         if self.model.domain.requirements is None or len(self.model.domain.requirements) == 0:
             return
 
         logging.info('__________________________________________________')
 
         # sets omega to observe only observ-fluents (ignore interm and state-fluents)
+        # TODO assume homogeneous agents (partial observability affects all agents the same)
         if 'partially-observed' in self.model.domain.requirements:
-            observable = [actionKey(agent.name)]  # todo what do we need to put here?
-            for sf in self.model.domain.observ_fluents.values():
-                if self._is_feature(sf.name):
-                    observable.append(self._get_feature(sf.name))
-            agent.omega = observable
-            logging.info(f'Setting partial observability for agent "{agent.name}", omega={agent.omega}')
+            for agent in self.world.agents.values():
+                observable = [actionKey(agent.name)]  # todo what do we need to put here?
+                for sf in self.model.domain.observ_fluents.values():
+                    if self._is_feature(sf.name):
+                        observable.append(self._get_feature(sf.name))
+                agent.omega = observable
+                logging.info(f'Setting partial observability for agent "{agent.name}", omega={agent.omega}')

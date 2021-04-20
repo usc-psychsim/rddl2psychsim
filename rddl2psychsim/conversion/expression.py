@@ -1,11 +1,10 @@
-import copy
 import logging
 import math
 from typing import Dict, Tuple, Union, List
 from pyrddl.expr import Expression
 from psychsim.agent import Agent
 from psychsim.pwl import CONSTANT, actionKey
-from rddl2psychsim.conversion import _ConverterBase, NORMAL_STDS, NORMAL_BINS
+from rddl2psychsim.conversion import _ConverterBase
 
 __author__ = 'Pedro Sequeira'
 __email__ = 'pedrodbs@gmail.com'
@@ -112,8 +111,7 @@ class _ExpressionConverter(_ConverterBase):
 
         raise ValueError(f'Cannot parse expression, invalid relational operation between {lhs} and {rhs}!')
 
-    def _get_nested_if(self, comp: Dict, true_branch: Dict, false_branch: Dict,
-                       expression: Expression = None, agent: Agent = None) -> Dict:
+    def _get_pwl_tree(self, comp: Dict, true_branch: Dict, false_branch: Dict, expression: Expression = None) -> Dict:
         if 'linear_and' in comp and len(comp) == 1:
             comp = comp['linear_and']  # AND of features (sum > w_sum - 0.5), see psychsim.world.World.float2value
             return {'if': (comp, sum([v for v in comp.values() if v > 0]) - 0.5, 1),
@@ -123,24 +121,24 @@ class _ExpressionConverter(_ConverterBase):
         if 'logic_and' in comp and len(comp) == 1:
             lhs, rhs = comp['logic_and']  # composes nested AND tree
             return {'if': lhs,
-                    True: self._get_nested_if(rhs, true_branch, false_branch, expression, agent),
+                    True: self._get_pwl_tree(rhs, true_branch, false_branch, expression),
                     False: false_branch}
 
         if 'linear_or' in comp and len(comp) == 1:
             comp = comp['linear_or']  # OR of features (A | B) <=> ~(~A ^ ~B)
-            return self._get_nested_if({'linear_and': _negate_linear_function(comp)},
-                                       false_branch,  # switch branches
-                                       true_branch)
+            return self._get_pwl_tree({'linear_and': _negate_linear_function(comp)},
+                                      false_branch,  # switch branches
+                                      true_branch)
 
         if 'logic_or' in comp and len(comp) == 1:
             lhs, rhs = comp['logic_or']  # composes nested OR tree
             return {'if': lhs,
                     True: true_branch,
-                    False: self._get_nested_if(rhs, true_branch, false_branch, expression, agent)}
+                    False: self._get_pwl_tree(rhs, true_branch, false_branch, expression)}
 
         if 'not' in comp and len(comp) == 1:
             # if NOT, just flip branches
-            return self._get_nested_if(comp['not'], false_branch, true_branch, expression, agent)
+            return self._get_pwl_tree(comp['not'], false_branch, true_branch, expression)
 
         if 'equiv' in comp:
             lhs, rhs = comp['equiv']
@@ -200,8 +198,9 @@ class _ExpressionConverter(_ConverterBase):
                     True: false_branch,  # then switch branches
                     False: true_branch}
 
-        if 'action' in comp and len(comp) == 1 and agent is not None:
-            return {'if': ({actionKey(agent.name): 1.}, comp['action'], 0),  # conditional on specific agent's action
+        if 'action' in comp and len(comp['action']) == 2:
+            agent, action = comp['action']
+            return {'if': ({actionKey(agent.name): 1.}, action, 0),  # conditional on specific agent's action
                     True: true_branch,
                     False: false_branch}
 
@@ -221,7 +220,7 @@ class _ExpressionConverter(_ConverterBase):
         param_combs = self._get_all_param_combs(param_types)
         return [dict(zip(param_names, param_comb)) for param_comb in param_combs]
 
-    def _convert_expression(self, expression: Expression, agent: Agent, param_map: Dict[str, str] = None) -> Dict:
+    def _convert_expression(self, expression: Expression, param_map: Dict[str, str] = None) -> Dict:
 
         # process leaf node, try to get feature name or constant value
         e_type = expression.etype[0]
@@ -252,8 +251,17 @@ class _ExpressionConverter(_ConverterBase):
             if self._is_feature(name):  # feature
                 return {self._get_feature(name): 1.}
 
-            if self._is_action(name, agent):
-                return {'action': self._get_action(name, agent)}  # identify this as the agent's action
+            ag_actions = []
+            for agent in self.world.agents.values():
+                if self._is_action(name, agent):
+                    ag_actions.append((agent, self._get_action(name, agent)))  # identify this an agent's action
+            if len(ag_actions) > 0:
+                # TODO can do plane disjunction when supported in PsychSim
+                # creates OR nested tree for matching any agents' actions
+                or_tree = {'action': ag_actions[0]}
+                for ag_action in ag_actions[1:]:
+                    or_tree = {'logical_or': (or_tree, {'action': ag_action})}
+                return or_tree
 
             if self._is_constant(name):  # named constant
                 try:
@@ -266,30 +274,30 @@ class _ExpressionConverter(_ConverterBase):
             raise ValueError(f'Could not find feature, action or constant from RDDL expression "{expression}"!')
 
         if e_type == 'arithmetic':
-            return self._convert_arithmetic_expr(expression, agent, param_map)
+            return self._convert_arithmetic_expr(expression, param_map)
 
         if e_type == 'boolean':
-            return self._convert_boolean_expr(expression, agent, param_map)
+            return self._convert_boolean_expr(expression, param_map)
 
         if e_type == 'relational':
-            return self._convert_relational_expr(expression, agent, param_map)
+            return self._convert_relational_expr(expression, param_map)
 
         if e_type == 'control':
-            return self._convert_control_expr(expression, agent, param_map)
+            return self._convert_control_expr(expression, param_map)
 
         if e_type == 'randomvar':
-            return self._convert_distribution_expr(expression, agent, param_map)
+            return self._convert_distribution_expr(expression, param_map)
 
         if e_type == 'aggregation':
-            return self._convert_aggregation_expr(expression, agent, param_map)
+            return self._convert_aggregation_expr(expression, param_map)
 
         # not yet implemented
         raise NotImplementedError(f'Cannot parse expression: "{expression}" of type "{e_type}"!')
 
-    def _convert_arithmetic_expr(self, expression: Expression, agent: Agent, param_map: Dict[str, str] = None) -> Dict:
+    def _convert_arithmetic_expr(self, expression: Expression, param_map: Dict[str, str] = None) -> Dict:
 
-        lhs = self._convert_expression(expression.args[0], agent, param_map)
-        rhs = self._convert_expression(expression.args[1], agent, param_map) if len(expression.args) > 1 else {}
+        lhs = self._convert_expression(expression.args[0], param_map)
+        rhs = self._convert_expression(expression.args[1], param_map) if len(expression.args) > 1 else {}
         lhs_const = _get_const_val(lhs)
         rhs_const = _get_const_val(rhs) if rhs is not None else None
         all_consts = isinstance(lhs_const, float) and isinstance(rhs_const, float)
@@ -330,10 +338,10 @@ class _ExpressionConverter(_ConverterBase):
 
         raise NotImplementedError(f'Cannot parse arithmetic expression: "{expression}" of type "{a_type}"!')
 
-    def _convert_boolean_expr(self, expression: Expression, agent: Agent, param_map: Dict[str, str] = None) -> Dict:
+    def _convert_boolean_expr(self, expression: Expression, param_map: Dict[str, str] = None) -> Dict:
 
-        lhs = self._convert_expression(expression.args[0], agent, param_map)
-        rhs = self._convert_expression(expression.args[1], agent, param_map) if len(expression.args) > 1 else {}
+        lhs = self._convert_expression(expression.args[0], param_map)
+        rhs = self._convert_expression(expression.args[1], param_map) if len(expression.args) > 1 else {}
         lhs_const = _get_const_val(lhs)
         rhs_const = _get_const_val(rhs)
         all_consts = isinstance(lhs_const, float) and isinstance(rhs_const, float)
@@ -433,10 +441,10 @@ class _ExpressionConverter(_ConverterBase):
 
         raise NotImplementedError(f'Cannot parse boolean expression: "{expression}" of type "{b_type}"!')
 
-    def _convert_relational_expr(self, expression: Expression, agent: Agent, param_map: Dict[str, str] = None) -> Dict:
+    def _convert_relational_expr(self, expression: Expression, param_map: Dict[str, str] = None) -> Dict:
 
-        lhs = self._convert_expression(expression.args[0], agent, param_map)
-        rhs = self._convert_expression(expression.args[1], agent, param_map) if len(expression.args) > 1 else {}
+        lhs = self._convert_expression(expression.args[0], param_map)
+        rhs = self._convert_expression(expression.args[1], param_map) if len(expression.args) > 1 else {}
         lhs_const = _get_const_val(lhs)
         rhs_const = _get_const_val(rhs)
         all_consts = isinstance(lhs_const, float) and isinstance(rhs_const, float)
@@ -522,20 +530,20 @@ class _ExpressionConverter(_ConverterBase):
 
         raise NotImplementedError(f'Cannot parse relational expression: "{expression}" of type "{b_type}"!')
 
-    def _convert_control_expr(self, expression: Expression, agent: Agent, param_map: Dict[str, str] = None) -> Dict:
+    def _convert_control_expr(self, expression: Expression, param_map: Dict[str, str] = None) -> Dict:
         c_type = expression.etype[1]
         if c_type == 'if':
             # get condition and branches
-            cond = self._convert_expression(expression.args[0], agent, param_map)
-            true_branch = self._convert_expression(expression.args[1], agent, param_map)
-            false_branch = self._convert_expression(expression.args[2], agent, param_map)
-            return self._get_nested_if(cond, true_branch, false_branch, expression, agent)
+            cond = self._convert_expression(expression.args[0], param_map)
+            true_branch = self._convert_expression(expression.args[1], param_map)
+            false_branch = self._convert_expression(expression.args[2], param_map)
+            return self._get_pwl_tree(cond, true_branch, false_branch, expression)
 
         if c_type == 'switch':
             assert len(expression.args) > 1, f'Cannot parse switch expression: "{expression}", no cases provided!'
 
             # get expression for terminal condition, has to be PWL
-            cond = self._convert_expression(expression.args[0], agent, param_map)
+            cond = self._convert_expression(expression.args[0], param_map)
             assert _is_linear_function(
                 cond), f'Cannot parse switch expression: "{expression}", switch condition is not PWL!'
 
@@ -545,13 +553,13 @@ class _ExpressionConverter(_ConverterBase):
             for arg in expression.args[1:]:
                 case_type = arg[0]
                 if case_type == 'case':
-                    val = self._convert_expression(arg[1][0], agent, param_map)
-                    branch = self._convert_expression(arg[1][1], agent, param_map)
+                    val = self._convert_expression(arg[1][0], param_map)
+                    branch = self._convert_expression(arg[1][1], param_map)
                 elif case_type == 'default':
                     assert 'default' not in case_values, f'Cannot parse switch expression: "{expression}", ' \
                                                          f'default branch defined more than once!'
                     val = 'default'
-                    branch = self._convert_expression(arg[1], agent, param_map)
+                    branch = self._convert_expression(arg[1], param_map)
                 else:
                     raise ValueError(f'Cannot parse switch expression: "{expression}", '
                                      f'unknown case type: "{case_type}"!')
@@ -566,11 +574,10 @@ class _ExpressionConverter(_ConverterBase):
 
         raise NotImplementedError(f'Cannot parse control expression: "{expression}" of type "{c_type}"!')
 
-    def _convert_distribution_expr(self, expression: Expression, agent: Agent,
-                                   param_map: Dict[str, str] = None) -> Dict:
+    def _convert_distribution_expr(self, expression: Expression, param_map: Dict[str, str] = None) -> Dict:
         d_type = expression.etype[1]
         if d_type == 'Bernoulli':
-            arg = self._convert_expression(expression.args[0], agent, param_map)
+            arg = self._convert_expression(expression.args[0], param_map)
             assert _get_const_val(arg) is not None, \
                 f'Cannot parse stochastic expression: "{expression}", non-constant probability: "{arg}"!'
             p = arg[CONSTANT]
@@ -579,12 +586,12 @@ class _ExpressionConverter(_ConverterBase):
         if d_type == 'KronDelta':
             # return the argument itself, although result should be int? From the docs:
             # "places all probability mass on its discrete argument v, discrete sample is thus deterministic"
-            return self._convert_expression(expression.args[0], agent, param_map)
+            return self._convert_expression(expression.args[0], param_map)
 
         if d_type == 'DiracDelta':
             # return the argument itself. From the docs:
             # "places all probability mass on its continuous argument v, continuous sample is thus deterministic"
-            return self._convert_expression(expression.args[0], agent, param_map)
+            return self._convert_expression(expression.args[0], param_map)
 
         if d_type == 'Discrete':
             def _get_value(val):
@@ -603,7 +610,7 @@ class _ExpressionConverter(_ConverterBase):
             dist = []
             for arg in expression.args[1:]:
                 k = _get_value(arg[1][0])
-                v = _get_const_val(self._convert_expression(arg[1][1], agent, param_map))
+                v = _get_const_val(self._convert_expression(arg[1][1], param_map))
                 assert v is not None, \
                     f'Cannot parse stochastic expression: "{expression}", non-constant probability: "{v}"!'
                 if v > 0:
@@ -615,8 +622,8 @@ class _ExpressionConverter(_ConverterBase):
 
         if d_type == 'Normal':
             # check params, have to be linear functions
-            mu = self._convert_expression(expression.args[0], agent, param_map)
-            std = self._convert_expression(expression.args[1], agent, param_map)  # assume this is stdev, not variance!
+            mu = self._convert_expression(expression.args[0], param_map)
+            std = self._convert_expression(expression.args[1], param_map)  # assume this is stdev, not variance!
             assert _is_linear_function(mu) and _is_linear_function(std), \
                 f'Cannot parse stochastic expression: "{expression}", mean and std have to be linear functions!'
             dist = []
@@ -633,7 +640,7 @@ class _ExpressionConverter(_ConverterBase):
 
         if d_type == 'Poisson':
             # check param, has to be linear function
-            lamb = self._convert_expression(expression.args[0], agent, param_map)
+            lamb = self._convert_expression(expression.args[0], param_map)
             assert _is_linear_function(lamb), \
                 f'Cannot parse stochastic expression: "{expression}", lambda has to be linear function!'
             dist = []
@@ -651,7 +658,7 @@ class _ExpressionConverter(_ConverterBase):
 
         raise NotImplementedError(f'Cannot parse stochastic expression: "{expression}" of type "{d_type}"!')
 
-    def _convert_aggregation_expr(self, expression: Expression, agent: Agent, param_map: Dict[str, str] = None) -> Dict:
+    def _convert_aggregation_expr(self, expression: Expression, param_map: Dict[str, str] = None) -> Dict:
         d_type = expression.etype[1]
         if param_map is None:
             param_map = {}
@@ -664,7 +671,7 @@ class _ExpressionConverter(_ConverterBase):
             param_maps = self._get_param_mappings(expression)
             lf = {}
             for p_map in param_maps:
-                expr = self._convert_expression(expression.args[-1], agent, {**param_map, **p_map})
+                expr = self._convert_expression(expression.args[-1], {**param_map, **p_map})
                 lf = _combine_linear_functions(lf, expr)  # sum linear functions
             return {CONSTANT: 0} if len(lf) == 0 else lf
 
@@ -676,7 +683,7 @@ class _ExpressionConverter(_ConverterBase):
             param_maps = self._get_param_mappings(expression)
             lf = {CONSTANT: 1.}
             for p_map in param_maps:
-                expr = self._convert_expression(expression.args[-1], agent, {**param_map, **p_map})
+                expr = self._convert_expression(expression.args[-1], {**param_map, **p_map})
                 const_val = _get_const_val(expr)
                 assert const_val is not None, \
                     f'Cannot parse aggregation: "{expression}", non-constant expression: "{expr}"!'
@@ -691,7 +698,7 @@ class _ExpressionConverter(_ConverterBase):
             param_maps = self._get_param_mappings(expression)
             sub_exprs = []
             for p_map in param_maps:
-                sub_exprs.append(self._convert_expression(expression.args[-1], agent, {**param_map, **p_map}))
+                sub_exprs.append(self._convert_expression(expression.args[-1], {**param_map, **p_map}))
 
             # if all linear ops, just add everything (thresh >= len)
             if all(_is_linear_function(expr) for expr in sub_exprs):
@@ -714,7 +721,7 @@ class _ExpressionConverter(_ConverterBase):
             param_maps = self._get_param_mappings(expression)
             sub_exprs = []
             for p_map in param_maps:
-                sub_exprs.append(self._convert_expression(expression.args[-1], agent, {**param_map, **p_map}))
+                sub_exprs.append(self._convert_expression(expression.args[-1], {**param_map, **p_map}))
 
             # if all linear ops, just add everything (linear OR)
             if all(_is_linear_function(expr) for expr in sub_exprs):

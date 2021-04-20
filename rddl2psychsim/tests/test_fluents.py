@@ -1,12 +1,9 @@
 import unittest
-
-from psychsim.pwl import stateKey
+from psychsim.pwl import stateKey, WORLD
 from rddl2psychsim.conversion.converter import Converter
 
 __author__ = 'Pedro Sequeira'
 __email__ = 'pedrodbs@gmail.com'
-
-AG_NAME = 'Agent'
 
 
 class TestTypes(unittest.TestCase):
@@ -25,11 +22,11 @@ class TestTypes(unittest.TestCase):
                 instance my_test_inst { domain = my_test; init-state { a; }; }
                 '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, 1)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, 2)
 
     def test_int_fluent_init(self):
@@ -46,11 +43,11 @@ class TestTypes(unittest.TestCase):
                 instance my_test_inst { domain = my_test; init-state {  p = 3; }; }
                 '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, 3)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, 2)
 
     def test_bool_fluent_def(self):
@@ -67,11 +64,11 @@ class TestTypes(unittest.TestCase):
                 instance my_test_inst { domain = my_test; init-state { a; }; }
                 '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
 
     def test_bool_fluent_init(self):
@@ -88,11 +85,11 @@ class TestTypes(unittest.TestCase):
                 instance my_test_inst { domain = my_test; init-state {  p = false; }; }
                 '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
 
     def test_real_fluent_def(self):
@@ -109,11 +106,11 @@ class TestTypes(unittest.TestCase):
                 instance my_test_inst { domain = my_test; init-state { a; }; }
                 '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, 3.14)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, -.02)
 
     def test_real_fluent_init(self):
@@ -130,11 +127,11 @@ class TestTypes(unittest.TestCase):
                 instance my_test_inst { domain = my_test; init-state {  p = 6.28; }; }
                 '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, 6.28)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, -0.01)
 
     def test_enum_fluent_def(self):
@@ -154,11 +151,11 @@ class TestTypes(unittest.TestCase):
                 instance my_test_inst { domain = my_test; init-state { a; }; }
                 '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, 'high')
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, 'medium')
 
     def test_enum_fluent_init(self):
@@ -178,11 +175,11 @@ class TestTypes(unittest.TestCase):
                 instance my_test_inst { domain = my_test; init-state { p = @low; }; }
                 '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, 'low')
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, 'medium')
 
     def test_interm_fluent(self):
@@ -199,11 +196,11 @@ class TestTypes(unittest.TestCase):
                 instance my_test_inst { domain = my_test; init-state { a; }; }
                 '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, 0)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, 2)
 
     def test_observ_fluent(self):
@@ -220,11 +217,11 @@ class TestTypes(unittest.TestCase):
                 instance my_test_inst { domain = my_test; init-state { a; }; }
                 '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, 0)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, 2)
 
     def test_non_fluent_def(self):
@@ -242,11 +239,11 @@ class TestTypes(unittest.TestCase):
                 instance my_test_inst { domain = my_test; init-state { a; }; }
                 '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, 1)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, 3)
 
     def test_non_fluent_init(self):
@@ -264,11 +261,11 @@ class TestTypes(unittest.TestCase):
                 instance my_test_inst { domain = my_test; init-state { a; }; }
                 '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, 1)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, 0)
 
     def test_fluent_param_def(self):
@@ -292,13 +289,13 @@ class TestTypes(unittest.TestCase):
                 instance my_test_inst {{ domain = my_test; init-state {{ a; }}; }}
                 '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
+        conv.convert_str(rddl)
         for o, v in objs.items():
-            p = conv.world.getState(AG_NAME, Converter.get_fluent_name(('p', o)), unique=True)
+            p = conv.world.getState(WORLD, Converter.get_fluent_name(('p', o)), unique=True)
             self.assertEqual(p, True)
         conv.world.step()
         for o, v in objs.items():
-            p = conv.world.getState(AG_NAME, Converter.get_fluent_name(('p', o)), unique=True)
+            p = conv.world.getState(WORLD, Converter.get_fluent_name(('p', o)), unique=True)
             self.assertEqual(p, False)
 
     def test_fluent_param_init(self):
@@ -327,13 +324,13 @@ class TestTypes(unittest.TestCase):
                 }}
                 '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
+        conv.convert_str(rddl)
         for o, v in objs.items():
-            p = conv.world.getState(AG_NAME, Converter.get_fluent_name(('p', o)), unique=True)
+            p = conv.world.getState(WORLD, Converter.get_fluent_name(('p', o)), unique=True)
             self.assertEqual(p, v)
         conv.world.step()
         for o, v in objs.items():
-            p = conv.world.getState(AG_NAME, Converter.get_fluent_name(('p', o)), unique=True)
+            p = conv.world.getState(WORLD, Converter.get_fluent_name(('p', o)), unique=True)
             self.assertEqual(p, False)
 
     def test_fluent_multi_param_init(self):
@@ -365,13 +362,13 @@ class TestTypes(unittest.TestCase):
                 }}
                 '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
+        conv.convert_str(rddl)
         for o, v in objs.items():
-            p = conv.world.getState(AG_NAME, Converter.get_fluent_name(('p', *o)), unique=True)
+            p = conv.world.getState(WORLD, Converter.get_fluent_name(('p', *o)), unique=True)
             self.assertEqual(p, v)
         conv.world.step()
         for o, v in objs.items():
-            p = conv.world.getState(AG_NAME, Converter.get_fluent_name(('p', *o)), unique=True)
+            p = conv.world.getState(WORLD, Converter.get_fluent_name(('p', *o)), unique=True)
             self.assertEqual(p, False)
 
     def test_fluent_multi_param_init2(self):
@@ -407,13 +404,13 @@ class TestTypes(unittest.TestCase):
                 }}
                 '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
+        conv.convert_str(rddl)
         for o, v in objs.items():
-            p = conv.world.getState(AG_NAME, Converter.get_fluent_name(('p', *o)), unique=True)
+            p = conv.world.getState(WORLD, Converter.get_fluent_name(('p', *o)), unique=True)
             self.assertEqual(p, v)
         conv.world.step()
         for o, v in objs.items():
-            p = conv.world.getState(AG_NAME, Converter.get_fluent_name(('p', *o)), unique=True)
+            p = conv.world.getState(WORLD, Converter.get_fluent_name(('p', *o)), unique=True)
             self.assertEqual(p, False)
 
     def test_fluent_multi_param_dyn_self(self):
@@ -445,13 +442,13 @@ class TestTypes(unittest.TestCase):
                 }}
                 '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
+        conv.convert_str(rddl)
         for o, v in objs.items():
-            p = conv.world.getState(AG_NAME, Converter.get_fluent_name(('p', *o)), unique=True)
+            p = conv.world.getState(WORLD, Converter.get_fluent_name(('p', *o)), unique=True)
             self.assertEqual(p, v)
         conv.world.step()
         for o, v in objs.items():
-            p = conv.world.getState(AG_NAME, Converter.get_fluent_name(('p', *o)), unique=True)
+            p = conv.world.getState(WORLD, Converter.get_fluent_name(('p', *o)), unique=True)
             self.assertEqual(p, v)
 
     def test_fluent_multi_param_dyn_const(self):
@@ -491,13 +488,13 @@ class TestTypes(unittest.TestCase):
                 }}
                 '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
+        conv.convert_str(rddl)
         for o, v in objs.items():
-            p = conv.world.getState(AG_NAME, Converter.get_fluent_name(('p', *o)), unique=True)
+            p = conv.world.getState(WORLD, Converter.get_fluent_name(('p', *o)), unique=True)
             self.assertEqual(p, v)
         conv.world.step()
         for o, v in objs.items():
-            p = conv.world.getState(AG_NAME, Converter.get_fluent_name(('p', *o)), unique=True)
+            p = conv.world.getState(WORLD, Converter.get_fluent_name(('p', *o)), unique=True)
             self.assertEqual(p, v and (consts[o] >= 1))
 
     def test_non_fluent_param_def(self):
@@ -522,7 +519,7 @@ class TestTypes(unittest.TestCase):
                 instance my_test_inst {{ domain = my_test; init-state {{ a; }}; }}
                 '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
+        conv.convert_str(rddl)
         for o, v in objs.items():
             self.assertIn(Converter.get_fluent_name(('C', o)), conv.constants)
             self.assertEqual(conv.constants[Converter.get_fluent_name(('C', o))], -1)
@@ -552,7 +549,7 @@ class TestTypes(unittest.TestCase):
                 instance my_test_inst {{ domain = my_test; init-state {{ a; }}; }}
                 '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
+        conv.convert_str(rddl)
         for o, v in objs.items():
             self.assertIn(Converter.get_fluent_name(('C', o)), conv.constants)
             self.assertEqual(conv.constants[Converter.get_fluent_name(('C', o))], v)
@@ -587,7 +584,7 @@ class TestTypes(unittest.TestCase):
                 instance my_test_inst {{ domain = my_test; init-state {{ a; }}; }}
                 '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
+        conv.convert_str(rddl)
         for o, v in objs.items():
             self.assertIn(Converter.get_fluent_name(('C', *o)), conv.constants)
             self.assertEqual(conv.constants[Converter.get_fluent_name(('C', *o))], v)
@@ -624,7 +621,7 @@ class TestTypes(unittest.TestCase):
                 instance my_test_inst {{ domain = my_test; init-state {{ a; }}; }}
                 '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
+        conv.convert_str(rddl)
         for o, v in objs.items():
             self.assertIn(Converter.get_fluent_name(('C', *o)), conv.constants)
             self.assertEqual(conv.constants[Converter.get_fluent_name(('C', *o))], v)
@@ -645,18 +642,16 @@ class TestTypes(unittest.TestCase):
                 instance my_test_inst { domain = my_test; init-state { a; }; }
                 '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        agent = conv.world.agents[AG_NAME]
-        self.assertNotIn(stateKey(AG_NAME, 'p'), agent.omega)
-        self.assertIn(stateKey(AG_NAME, 'q'), agent.omega)
+        conv.convert_str(rddl)
+        agent = next(iter(conv.world.agents.values()))
+        self.assertNotIn(stateKey(WORLD, 'p'), agent.omega)
+        self.assertIn(stateKey(WORLD, 'q'), agent.omega)
 
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, 1)
         conv.world.step()
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, 4)
-        q = conv.world.getState(AG_NAME, 'q', unique=True)
+        q = conv.world.getState(WORLD, 'q', unique=True)
         self.assertEqual(q, 3)
-
-    # TODO test use of parameterized fluents and param Constants in dynamics expressions of param fluents!

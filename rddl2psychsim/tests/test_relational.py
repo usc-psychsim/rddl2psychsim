@@ -1,10 +1,9 @@
 import unittest
+from psychsim.pwl import WORLD
 from rddl2psychsim.conversion.converter import Converter
 
 __author__ = 'Pedro Sequeira'
 __email__ = 'pedrodbs@gmail.com'
-
-AG_NAME = 'Agent'
 
 
 class TestRelational(unittest.TestCase):
@@ -25,11 +24,11 @@ class TestRelational(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
 
     def test_eq_false_const(self):
@@ -47,11 +46,11 @@ class TestRelational(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
 
     def test_eq_false_consts(self):
@@ -68,11 +67,11 @@ class TestRelational(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
 
     def test_eq_true(self):
@@ -91,11 +90,11 @@ class TestRelational(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
 
     def test_eq_true_num(self):
@@ -114,11 +113,11 @@ class TestRelational(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
 
     def test_eq_true_self(self):
@@ -136,11 +135,11 @@ class TestRelational(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
 
     def test_eq_true_const(self):
@@ -158,11 +157,11 @@ class TestRelational(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
 
     def test_eq_true_vars_consts(self):
@@ -181,11 +180,11 @@ class TestRelational(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
 
     def test_eq_true_num_consts(self):
@@ -202,11 +201,11 @@ class TestRelational(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
 
     def test_eq_true_bool_consts(self):
@@ -223,11 +222,11 @@ class TestRelational(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
 
     def test_eq_true_linear(self):
@@ -246,11 +245,11 @@ class TestRelational(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
 
     def test_neq_false(self):
@@ -269,11 +268,11 @@ class TestRelational(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
 
     def test_neq_false_const(self):
@@ -291,11 +290,11 @@ class TestRelational(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
 
     def test_neq_false_consts(self):
@@ -312,11 +311,11 @@ class TestRelational(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
 
     def test_neq_false_self(self):
@@ -334,11 +333,11 @@ class TestRelational(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
 
     def test_neq_false_vars_consts(self):
@@ -357,11 +356,11 @@ class TestRelational(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
 
     def test_neq_true(self):
@@ -380,11 +379,11 @@ class TestRelational(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
 
     def test_neq_true_num(self):
@@ -403,11 +402,11 @@ class TestRelational(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
 
     def test_neq_true_const(self):
@@ -425,11 +424,11 @@ class TestRelational(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
 
     def test_neq_true_consts(self):
@@ -446,11 +445,11 @@ class TestRelational(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
 
     def test_geq_false(self):
@@ -469,11 +468,11 @@ class TestRelational(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
 
     def test_geq_false_const(self):
@@ -491,11 +490,11 @@ class TestRelational(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
 
     def test_geq_false_consts(self):
@@ -512,11 +511,11 @@ class TestRelational(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
 
     def test_geq_true(self):
@@ -535,11 +534,11 @@ class TestRelational(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
 
     def test_geq_true_num(self):
@@ -558,11 +557,11 @@ class TestRelational(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
 
     def test_geq_true_self(self):
@@ -580,11 +579,11 @@ class TestRelational(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
 
     def test_geq_true_const(self):
@@ -602,11 +601,11 @@ class TestRelational(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
 
     def test_geq_true_vars_consts(self):
@@ -625,11 +624,11 @@ class TestRelational(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
 
     def test_geq_true_num_consts(self):
@@ -646,11 +645,11 @@ class TestRelational(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
 
     def test_geq_true_bool_consts(self):
@@ -667,11 +666,11 @@ class TestRelational(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
 
     def test_geq_true_linear(self):
@@ -690,11 +689,11 @@ class TestRelational(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
 
     def test_leq_false(self):
@@ -713,11 +712,11 @@ class TestRelational(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
 
     def test_leq_false_const(self):
@@ -735,11 +734,11 @@ class TestRelational(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
 
     def test_leq_false_consts(self):
@@ -756,11 +755,11 @@ class TestRelational(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
 
     def test_leq_true(self):
@@ -779,11 +778,11 @@ class TestRelational(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
 
     def test_leq_true_num(self):
@@ -802,11 +801,11 @@ class TestRelational(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
 
     def test_leq_true_self(self):
@@ -824,11 +823,11 @@ class TestRelational(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
 
     def test_leq_true_const(self):
@@ -846,11 +845,11 @@ class TestRelational(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
 
     def test_leq_true_vars_consts(self):
@@ -869,11 +868,11 @@ class TestRelational(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
 
     def test_leq_true_num_consts(self):
@@ -890,11 +889,11 @@ class TestRelational(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
 
     def test_leq_true_bool_consts(self):
@@ -911,11 +910,11 @@ class TestRelational(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
 
     def test_leq_true_linear(self):
@@ -934,11 +933,11 @@ class TestRelational(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
 
     def test_gt_false(self):
@@ -957,11 +956,11 @@ class TestRelational(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
 
     def test_gt_false_const(self):
@@ -979,11 +978,11 @@ class TestRelational(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
 
     def test_gt_false_consts(self):
@@ -1000,11 +999,11 @@ class TestRelational(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
 
     def test_gt_false_self(self):
@@ -1022,11 +1021,11 @@ class TestRelational(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
 
     def test_gt_false_vars_consts(self):
@@ -1045,11 +1044,11 @@ class TestRelational(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
 
     def test_gt_true(self):
@@ -1068,11 +1067,11 @@ class TestRelational(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
 
     def test_gt_true_num(self):
@@ -1091,11 +1090,11 @@ class TestRelational(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
 
     def test_gt_true_const(self):
@@ -1113,11 +1112,11 @@ class TestRelational(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
 
     def test_gt_true_consts(self):
@@ -1134,11 +1133,11 @@ class TestRelational(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
 
     def test_gt_true_vars_consts(self):
@@ -1157,11 +1156,11 @@ class TestRelational(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
 
     def test_lt_false(self):
@@ -1180,11 +1179,11 @@ class TestRelational(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
 
     def test_lt_false_const(self):
@@ -1202,11 +1201,11 @@ class TestRelational(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
 
     def test_lt_false_consts(self):
@@ -1223,11 +1222,11 @@ class TestRelational(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
 
     def test_lt_false_self(self):
@@ -1245,11 +1244,11 @@ class TestRelational(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
 
     def test_lt_false_vars_consts(self):
@@ -1268,11 +1267,11 @@ class TestRelational(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
 
     def test_lt_true(self):
@@ -1291,11 +1290,11 @@ class TestRelational(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
 
     def test_lt_true_num(self):
@@ -1314,11 +1313,11 @@ class TestRelational(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
 
     def test_lt_true_const(self):
@@ -1336,11 +1335,11 @@ class TestRelational(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
 
     def test_lt_true_consts(self):
@@ -1357,11 +1356,11 @@ class TestRelational(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
 
     def test_lt_true_vars_consts(self):
@@ -1380,11 +1379,11 @@ class TestRelational(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
 
 

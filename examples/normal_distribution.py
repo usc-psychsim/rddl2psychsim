@@ -1,12 +1,12 @@
 import numpy as np
 import scipy.stats as stats
 import matplotlib.pyplot as plt
+from psychsim.pwl import WORLD
 from rddl2psychsim.conversion.converter import Converter
 
 __author__ = 'Pedro Sequeira'
 __email__ = 'pedrodbs@gmail.com'
 
-AG_NAME = 'Agent'
 COVERED_STDS = 3
 NUM_BINS = 7
 MU = 3
@@ -31,12 +31,12 @@ domain my_test {{
 
 if __name__ == '__main__':
     conv = Converter()
-    conv.convert_str(RDDL, AG_NAME)
+    conv.convert_str(RDDL)
 
     samples = []
     for i in range(NUM_SAMPLES):
         conv.world.step(select=True)  # select sample
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         samples.append(p)
     mu, std = stats.norm.fit(samples)
     print(f'estimated mu={mu}, std={std}')

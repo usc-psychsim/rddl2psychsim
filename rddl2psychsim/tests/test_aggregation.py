@@ -1,11 +1,10 @@
 import unittest
 import numpy as np
+from psychsim.pwl import WORLD
 from rddl2psychsim.conversion.converter import Converter
 
 __author__ = 'Pedro Sequeira'
 __email__ = 'pedrodbs@gmail.com'
-
-AG_NAME = 'Agent'
 
 
 class TestAggregation(unittest.TestCase):
@@ -37,11 +36,11 @@ class TestAggregation(unittest.TestCase):
                 }}
                 '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, -1)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, sum(objs.values()))
 
     def test_fluent_multi_sum(self):
@@ -76,11 +75,11 @@ class TestAggregation(unittest.TestCase):
                 }}
                 '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, -1)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, sum(objs.values()))
 
     def test_fluent_multi_sum2(self):
@@ -117,11 +116,11 @@ class TestAggregation(unittest.TestCase):
                 }}
                 '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, -1)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, 2 * sum(objs.values()))
 
     def test_fluent_multi_sum3(self):
@@ -163,11 +162,11 @@ class TestAggregation(unittest.TestCase):
                 }}
                 '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, -1)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, 2 * sum(objs1[(x, y)] + 2 * objs2[x] for x, y in objs1.keys()))
 
     def test_non_fluent_sum(self):
@@ -195,11 +194,11 @@ class TestAggregation(unittest.TestCase):
                 instance my_test_inst {{ domain = my_test; init-state {{ a; }}; }}
                 '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, -1)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, sum(objs.values()))
 
     def test_non_fluent_multi_sum(self):
@@ -232,11 +231,11 @@ class TestAggregation(unittest.TestCase):
                 instance my_test_inst {{ domain = my_test; init-state {{ a; }}; }}
                 '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, -1)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, sum(objs.values()))
 
     def test_non_fluent_multi_sum2(self):
@@ -271,11 +270,11 @@ class TestAggregation(unittest.TestCase):
                 instance my_test_inst {{ domain = my_test; init-state {{ a; }}; }}
                 '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, -1)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, 2 * sum(objs.values()))
 
     def test_invalid_fluent_prod(self):
@@ -306,7 +305,7 @@ class TestAggregation(unittest.TestCase):
                 '''
         conv = Converter()
         with self.assertRaises(AssertionError):
-            conv.convert_str(rddl, AG_NAME)
+            conv.convert_str(rddl)
 
     def test_non_fluent_prod(self):
         objs = {'x1': 1, 'x2': 2, 'x3': 3, 'x4': 4}
@@ -333,11 +332,11 @@ class TestAggregation(unittest.TestCase):
                 instance my_test_inst {{ domain = my_test; init-state {{ a; }}; }}
                 '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, -1)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, np.prod(list(objs.values())))
 
     def test_non_fluent_multi_prod(self):
@@ -372,11 +371,11 @@ class TestAggregation(unittest.TestCase):
                 instance my_test_inst {{ domain = my_test; init-state {{ a; }}; }}
                 '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, -1)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, 3 + np.prod(list(objs.values())))
 
     def test_const_prod(self):
@@ -404,11 +403,11 @@ class TestAggregation(unittest.TestCase):
                 instance my_test_inst {{ domain = my_test; init-state {{ a; }}; }}
                 '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, -1)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, np.power(2, len(objs)))
 
     def test_fluent_forall_self(self):
@@ -438,11 +437,11 @@ class TestAggregation(unittest.TestCase):
                 }}
                 '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
 
     def test_fluent_forall_true(self):
@@ -472,11 +471,11 @@ class TestAggregation(unittest.TestCase):
                 }}
                 '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, all(objs.values()))
 
     def test_fluent_forall_false(self):
@@ -506,11 +505,11 @@ class TestAggregation(unittest.TestCase):
                 }}
                 '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, all(objs.values()))
 
     def test_fluent_forall_num(self):
@@ -540,11 +539,11 @@ class TestAggregation(unittest.TestCase):
                 }}
                 '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
 
     def test_const_forall_true(self):
@@ -574,11 +573,11 @@ class TestAggregation(unittest.TestCase):
                 }}
                 '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
 
     def test_const_forall_false(self):
@@ -608,11 +607,11 @@ class TestAggregation(unittest.TestCase):
                 }}
                 '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
 
     def test_fluent_forall_rel(self):
@@ -642,11 +641,11 @@ class TestAggregation(unittest.TestCase):
                 }}
                 '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, all(q >= 1 for q in objs.values()))
 
     def test_invalid_fluent_forall_if(self):
@@ -677,7 +676,7 @@ class TestAggregation(unittest.TestCase):
                 '''
         conv = Converter()
         with self.assertRaises(ValueError):
-            conv.convert_str(rddl, AG_NAME)
+            conv.convert_str(rddl)
 
     def test_fluent_exists_self(self):
         objs = {'x1': True, 'x2': True, 'x3': True, 'x4': True}
@@ -706,11 +705,11 @@ class TestAggregation(unittest.TestCase):
                 }}
                 '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
 
     def test_fluent_exists_true(self):
@@ -740,11 +739,11 @@ class TestAggregation(unittest.TestCase):
                 }}
                 '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, any(objs.values()))
 
     def test_fluent_exists_false(self):
@@ -774,11 +773,11 @@ class TestAggregation(unittest.TestCase):
                 }}
                 '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, any(objs.values()))
 
     def test_fluent_exists_num(self):
@@ -808,11 +807,11 @@ class TestAggregation(unittest.TestCase):
                 }}
                 '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
 
     def test_const_exists_true(self):
@@ -842,11 +841,11 @@ class TestAggregation(unittest.TestCase):
                 }}
                 '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
 
     def test_const_exists_false(self):
@@ -876,11 +875,11 @@ class TestAggregation(unittest.TestCase):
                 }}
                 '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
 
     def test_fluent_exists_rel(self):
@@ -910,11 +909,11 @@ class TestAggregation(unittest.TestCase):
                 }}
                 '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, any(q > 3 for q in objs.values()))
 
     def test_invalid_fluent_exists_if(self):
@@ -945,4 +944,4 @@ class TestAggregation(unittest.TestCase):
                 '''
         conv = Converter()
         with self.assertRaises(ValueError):
-            conv.convert_str(rddl, AG_NAME)
+            conv.convert_str(rddl)

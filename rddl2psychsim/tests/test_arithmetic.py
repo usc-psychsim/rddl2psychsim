@@ -1,10 +1,9 @@
 import unittest
+from psychsim.pwl import WORLD
 from rddl2psychsim.conversion.converter import Converter
 
 __author__ = 'Pedro Sequeira'
 __email__ = 'pedrodbs@gmail.com'
-
-AG_NAME = 'Agent'
 
 
 class TestNumArithmetics(unittest.TestCase):
@@ -24,10 +23,10 @@ class TestNumArithmetics(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
+        conv.convert_str(rddl)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
-        q = conv.world.getState(AG_NAME, 'q', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        q = conv.world.getState(WORLD, 'q', unique=True)
         self.assertEqual(p, 1 - 5)
         self.assertEqual(q, -5)
 
@@ -45,11 +44,11 @@ class TestNumArithmetics(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, 1)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, 1 - 5)
 
     def test_sum_consts(self):
@@ -66,11 +65,11 @@ class TestNumArithmetics(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, 1)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, 2 + 5)
 
     def test_sub(self):
@@ -88,10 +87,10 @@ class TestNumArithmetics(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
+        conv.convert_str(rddl)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
-        q = conv.world.getState(AG_NAME, 'q', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        q = conv.world.getState(WORLD, 'q', unique=True)
         self.assertEqual(p, 1 - 5)
         self.assertEqual(q, 5)
 
@@ -109,11 +108,11 @@ class TestNumArithmetics(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, 1)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, 1 - 5)
 
     def test_sub_consts(self):
@@ -130,11 +129,11 @@ class TestNumArithmetics(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, 1)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, 2 - 5)
 
     def test_mul_invalid(self):
@@ -153,7 +152,7 @@ class TestNumArithmetics(unittest.TestCase):
         '''
         conv = Converter()
         with self.assertRaises(ValueError):
-            conv.convert_str(rddl, AG_NAME)
+            conv.convert_str(rddl)
 
     def test_mul_const(self):
         rddl = '''
@@ -169,11 +168,11 @@ class TestNumArithmetics(unittest.TestCase):
            instance my_test_inst { domain = my_test; init-state { a; }; }
            '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, 1)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, 1 * 5)
 
     def test_mul_const2(self):
@@ -190,11 +189,11 @@ class TestNumArithmetics(unittest.TestCase):
            instance my_test_inst { domain = my_test; init-state { a; }; }
            '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, 1)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, 5 * 1)
 
     def test_mul_consts(self):
@@ -211,11 +210,11 @@ class TestNumArithmetics(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, 1)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, 2 * -5)
 
     def test_div_invalid(self):
@@ -234,7 +233,7 @@ class TestNumArithmetics(unittest.TestCase):
         '''
         conv = Converter()
         with self.assertRaises(ValueError):
-            conv.convert_str(rddl, AG_NAME)
+            conv.convert_str(rddl)
 
     def test_div_const(self):
         rddl = '''
@@ -250,11 +249,11 @@ class TestNumArithmetics(unittest.TestCase):
            instance my_test_inst { domain = my_test; init-state { a; }; }
            '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, 1)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, int(1 / 5))
 
     def test_div_invalid_const(self):
@@ -273,7 +272,7 @@ class TestNumArithmetics(unittest.TestCase):
         '''
         conv = Converter()
         with self.assertRaises(ValueError):
-            conv.convert_str(rddl, AG_NAME)
+            conv.convert_str(rddl)
 
     def test_div_consts(self):
         rddl = '''
@@ -289,11 +288,11 @@ class TestNumArithmetics(unittest.TestCase):
            instance my_test_inst { domain = my_test; init-state { a; }; }
            '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, 1)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, 1. / 5.)
 
     def test_div_consts2(self):
@@ -310,11 +309,11 @@ class TestNumArithmetics(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, 1)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, int(2 / 5))
 
     def test_comp(self):
@@ -332,10 +331,10 @@ class TestNumArithmetics(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
+        conv.convert_str(rddl)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
-        q = conv.world.getState(AG_NAME, 'q', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        q = conv.world.getState(WORLD, 'q', unique=True)
         self.assertEqual(p, int((1 + -5) - 1 * 2 + (-5 / 4)))
         self.assertEqual(q, -5)
 
@@ -353,11 +352,11 @@ class TestNumArithmetics(unittest.TestCase):
            instance my_test_inst { domain = my_test; init-state { a; }; }
            '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, 1.)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, 2 * (-5.1 + 4.5) / 3 - 1 * 0.9)
 
 
@@ -378,10 +377,10 @@ class TestBoolArithmetics(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
+        conv.convert_str(rddl)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
-        q = conv.world.getState(AG_NAME, 'q', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        q = conv.world.getState(WORLD, 'q', unique=True)
         self.assertEqual(p, False)
         self.assertEqual(q, False)
 
@@ -399,11 +398,11 @@ class TestBoolArithmetics(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
 
     def test_sum_const2(self):
@@ -420,11 +419,11 @@ class TestBoolArithmetics(unittest.TestCase):
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, bool((1 - 5) > 0))  # in PS boolean var is True iff value > 0
 
 

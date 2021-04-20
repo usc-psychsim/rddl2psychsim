@@ -3,8 +3,7 @@ import argparse
 import logging
 import numpy as np
 from tqdm import tqdm
-
-from psychsim.pwl import actionKey
+from psychsim.pwl import actionKey, WORLD
 from rddl2psychsim.conversion.converter import Converter
 
 __author__ = 'Pedro Sequeira'
@@ -14,7 +13,6 @@ __desc__ = 'Converts the Game-of-Life RDDL file to PsychSim and runs a simulatio
 MAX_STEPS = 50
 THRESHOLD = 0
 RDDL_FILE = 'examples/domains/game_of_life_stoch.rddl'
-AG_NAME = 'Agent'
 
 
 def print_state():
@@ -27,8 +25,8 @@ def print_state():
         for y in range(len(y_objs)):
             y_obj = y_objs[y]
             f_name = Converter.get_fluent_name(('alive', x_obj, y_obj))
-            state[x, y] = int(conv.world.getState(AG_NAME, f_name, unique=True))
-    logging.info(f'Action: {conv.world.getFeature(actionKey(AG_NAME), unique=True)}')
+            state[x, y] = int(conv.world.getState(WORLD, f_name, unique=True))
+    logging.info(f'Action: {conv.world.getFeature(actionKey(next(iter(conv.world.agents.keys()))), unique=True)}')
     logging.info(f'\n{state}')
 
 
@@ -45,7 +43,7 @@ if __name__ == '__main__':
     if not os.path.isfile(RDDL_FILE):
         raise ValueError(f'Could not find RDDL file: {RDDL_FILE}')
     conv = Converter()
-    conv.convert_file(RDDL_FILE, AG_NAME, verbose=True)
+    conv.convert_file(RDDL_FILE, verbose=True)
 
     logging.info('')
     logging.info('==================================================')

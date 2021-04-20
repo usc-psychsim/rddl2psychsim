@@ -1,7 +1,6 @@
 import logging
 from typing import Dict
 from pyrddl.expr import Expression
-from psychsim.agent import Agent
 from psychsim.pwl import KeyedVector, rewardKey, makeTree, makeFuture, KeyedMatrix, KeyedTree, KeyedPlane, \
     CONSTANT, noChangeMatrix
 from rddl2psychsim.conversion.expression import _ExpressionConverter, _is_linear_function, _combine_linear_functions, \
@@ -16,7 +15,7 @@ class _DynamicsConverter(_ExpressionConverter):
     def __init__(self):
         super().__init__()
 
-    def _convert_dynamics(self, agent):
+    def _convert_dynamics(self):
         # create dynamics from conditional probability functions (CPFs)
         logging.info('__________________________________________________')
         for cpf in self.model.domain.cpfs[1]:
@@ -38,22 +37,22 @@ class _DynamicsConverter(_ExpressionConverter):
                     if not self._is_feature(f_name):
                         raise ValueError(f'Could not find feature for fluent "{f_name}" in CPF "{cpf}"!')
                     f = self._get_feature(f_name)
-                    tree = self._create_dynamics_tree(f, cpf.expr, agent, dict(zip(params, p_vals)))
+                    tree = self._create_dynamics_tree(f, cpf.expr, dict(zip(params, p_vals)))
                     self.world.setDynamics(f, True, tree)
                     logging.info(f'Set dynamics for feature "{f}" to:\n{tree}')
             else:
                 raise NotImplementedError(f'Cannot convert CPF "{cpf}" of type "{f_type}"!')
 
-    def _convert_reward_function(self, agent):
-        # create reward function
+    def _convert_reward_function(self):
+        # create reward function # TODO assume homogeneous agents
         logging.info('__________________________________________________')
-        tree = self._create_dynamics_tree(rewardKey(agent.name), self.model.domain.reward, agent)
-        agent.setReward(tree, 1.)
-        logging.info(f'Set agent "{agent.name}" reward to:\n{tree}')
+        for agent in self.world.agents.values():
+            tree = self._create_dynamics_tree(rewardKey(agent.name), self.model.domain.reward)
+            agent.setReward(tree, 1.)
+            logging.info(f'Set agent "{agent.name}" reward to:\n{tree}')
 
-    def _create_dynamics_tree(self, key: str, expression: Expression, agent: Agent,
-                              param_map: Dict[str, str] = None) -> KeyedTree:
-        return makeTree(self._get_dynamics_tree(key, self._convert_expression(expression, agent, param_map)))
+    def _create_dynamics_tree(self, key: str, expression: Expression, param_map: Dict[str, str] = None) -> KeyedTree:
+        return makeTree(self._get_dynamics_tree(key, self._convert_expression(expression, param_map)))
 
     def _get_dynamics_tree(self, key: str, expr: Dict) -> KeyedMatrix or Dict:
 
@@ -61,15 +60,16 @@ class _DynamicsConverter(_ExpressionConverter):
         op = next(iter(expr.keys()))
         if len(expr) == 1 and op in \
                 {'linear_and', 'logic_and', 'linear_or', 'logic_or', 'not', 'equiv', 'imply',
-                 'eq', 'neq', 'gt', 'lt', 'geq', 'leq'}:
+                 'eq', 'neq', 'gt', 'lt', 'geq', 'leq',
+                 'action'}:
             if _get_const_val(expr[op]) is not None:
                 return self._get_dynamics_tree(key, expr[op])  # no need for tree if it's a constant value
-            return self._get_dynamics_tree(key, self._get_nested_if(expr, {CONSTANT: True}, {CONSTANT: False}))
+            return self._get_dynamics_tree(key, self._get_pwl_tree(expr, {CONSTANT: True}, {CONSTANT: False}))
 
         if 'if' in expr and len(expr) == 3:
             # check if no comparison provided, expression's truth value has to be resolved
             if len(expr['if']) == 1:
-                return self._get_dynamics_tree(key, self._get_nested_if(expr['if'], expr[True], expr[False]))
+                return self._get_dynamics_tree(key, self._get_pwl_tree(expr['if'], expr[True], expr[False]))
 
             # build if-then-else tree
             weights, threshold, comp = expr['if']

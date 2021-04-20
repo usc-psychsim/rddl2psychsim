@@ -1,10 +1,9 @@
 import unittest
+from psychsim.pwl import WORLD
 from rddl2psychsim.conversion.converter import Converter
 
 __author__ = 'Pedro Sequeira'
 __email__ = 'pedrodbs@gmail.com'
-
-AG_NAME = 'Agent'
 
 
 class TestTypes(unittest.TestCase):
@@ -23,11 +22,11 @@ class TestTypes(unittest.TestCase):
                 instance my_test_inst { domain = my_test; init-state { a; }; }
                 '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, 1)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, 2)
 
     def test_dirac_delta(self):
@@ -44,11 +43,11 @@ class TestTypes(unittest.TestCase):
                 instance my_test_inst { domain = my_test; init-state { a; }; }
                 '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, 1.4)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, 2.5)
 
     def test_bernoulli(self):
@@ -65,11 +64,11 @@ class TestTypes(unittest.TestCase):
                 instance my_test_inst { domain = my_test; init-state { a; }; }
                 '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, 0)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p')
+        p = conv.world.getState(WORLD, 'p')
         self.assertEqual(p[0], 0.7)
         self.assertEqual(p[1], 0.3)
 
@@ -96,11 +95,11 @@ class TestTypes(unittest.TestCase):
                 instance my_test_inst { domain = my_test; init-state { a; }; }
                 '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, 'low')
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p')
+        p = conv.world.getState(WORLD, 'p')
         self.assertEqual(p['low'], 0.5)
         self.assertEqual(p['medium'], 0.2)
         self.assertEqual(p['high'], 0.3)
@@ -129,7 +128,7 @@ class TestTypes(unittest.TestCase):
                 '''
         conv = Converter()
         with self.assertRaises(AssertionError):
-            conv.convert_str(rddl, AG_NAME)
+            conv.convert_str(rddl)
 
     def test_discrete_const(self):
         rddl = '''
@@ -151,11 +150,11 @@ class TestTypes(unittest.TestCase):
                 instance my_test_inst { domain = my_test; init-state { a; }; }
                 '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, 'low')
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p')
+        p = conv.world.getState(WORLD, 'p')
         self.assertEqual(p['low'], 0.1)
         self.assertEqual(p['medium'], 0.6)
         self.assertEqual(p['high'], 0.3)
@@ -180,7 +179,7 @@ class TestTypes(unittest.TestCase):
                 '''
         conv = Converter()
         with self.assertRaises(AssertionError):
-            conv.convert_str(rddl, AG_NAME)
+            conv.convert_str(rddl)
 
     def test_normal_const(self):
         mean = 3
@@ -200,11 +199,11 @@ class TestTypes(unittest.TestCase):
                 instance my_test_inst {{ domain = my_test; init-state {{ a; }}; }}
                 '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, 0)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p')
+        p = conv.world.getState(WORLD, 'p')
         import numpy as np
         bins = np.array(conv._normal_bins) * std + mean
         for k, v in zip(bins, conv._normal_probs):
@@ -228,11 +227,11 @@ class TestTypes(unittest.TestCase):
                 instance my_test_inst {{ domain = my_test; init-state {{ a; }}; }}
                 '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p_ = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p_ = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p_, mean)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p')
+        p = conv.world.getState(WORLD, 'p')
         import numpy as np
         bins = np.array(conv._normal_bins) * (std + p_) + mean
         for k, v in zip(bins, conv._normal_probs):
@@ -257,11 +256,11 @@ class TestTypes(unittest.TestCase):
                 instance my_test_inst {{ domain = my_test; init-state {{ a; }}; }}
                 '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p_ = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p_ = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p_, 0)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p')
+        p = conv.world.getState(WORLD, 'p')
         import numpy as np
         bins = np.array(conv._normal_bins)
         for k, v in zip(bins, conv._normal_probs):
@@ -284,11 +283,11 @@ class TestTypes(unittest.TestCase):
                 instance my_test_inst {{ domain = my_test; init-state {{ a; }}; }}
                 '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, 0)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p')
+        p = conv.world.getState(WORLD, 'p')
         import numpy as np
         bins = np.array(conv._normal_bins) * np.sqrt(conv._poisson_exp_rate) + mean
         for k, v in zip(bins, conv._normal_probs):
@@ -311,11 +310,11 @@ class TestTypes(unittest.TestCase):
                 instance my_test_inst {{ domain = my_test; init-state {{ a; }}; }}
                 '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, 0)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p')
+        p = conv.world.getState(WORLD, 'p')
         import numpy as np
         bins = np.array(conv._normal_bins) * np.sqrt(conv._poisson_exp_rate) + mean
         for k, v in zip(bins, conv._normal_probs):
@@ -346,11 +345,11 @@ class TestTypes(unittest.TestCase):
                 instance my_test_inst {{ domain = my_test; init-state {{ a; }}; }}
                 '''
         conv = Converter()
-        conv.convert_str(rddl, AG_NAME)
-        p = conv.world.getState(AG_NAME, 'p', unique=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, mean)
         conv.world.step()
-        p = conv.world.getState(AG_NAME, 'p')
+        p = conv.world.getState(WORLD, 'p')
         import numpy as np
         bins = np.array(conv._normal_bins) * np.sqrt(conv._poisson_exp_rate) + mean
         for k, v in zip(bins, conv._normal_probs):

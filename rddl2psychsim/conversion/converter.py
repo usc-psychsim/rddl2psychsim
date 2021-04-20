@@ -11,33 +11,32 @@ class Converter(_DynamicsConverter):
     def __init__(self):
         super().__init__()
 
-    def convert_file(self, rddl_file: str, agent_name='Agent', verbose=True) -> None:
+    def convert_file(self, rddl_file: str, verbose=True) -> None:
         # parse RDDL file, set model
         self.model = parse_rddl_file(rddl_file, verbose)
-        self._convert_rddl(agent_name)
+        self._convert_rddl()
         logging.info('==================================================')
         logging.info(f'Done processing {rddl_file}!')
 
-    def convert_str(self, rddl_str: str, agent_name='Agent', verbose=True) -> None:
+    def convert_str(self, rddl_str: str, verbose=True) -> None:
         # parse RDDL string, set model
         self.model = parse_rddl(rddl_str, verbose)
-        self._convert_rddl(agent_name)
+        self._convert_rddl()
         logging.info('==================================================')
         logging.info(f'Done processing RDDL string!')
 
-    def _convert_rddl(self, agent_name):
+    def _convert_rddl(self):
         logging.info('==================================================')
         logging.info(f'Converting RDDL domain "{self.model.domain.name}" '
                      f'using instance "{self.model.instance.name}" to PsychSim...')
 
-        # TODO maybe read agent(s) names from rddl file? How would we separate stuff? how about models?
-        agent = self._create_world_agents(agent_name)
-        self._parse_requirements_pre(agent)
+        self._create_world_agents()
+        self._parse_requirements_pre()
         self._convert_constants()
-        self._convert_variables(agent)
-        self._convert_actions(agent)
-        self._convert_reward_function(agent)
-        self._convert_dynamics(agent)
-        self._initialize_variables(agent)
-        self._parse_requirements_post(agent)
-        self.world.setOrder([{agent.name}])
+        self._convert_variables()
+        self._convert_actions()
+        self._convert_reward_function()
+        self._convert_dynamics()
+        self._initialize_variables()
+        self._parse_requirements_post()
+        self.world.setOrder([set(self.world.agents.keys())])  # TODO assumes whichever agents created act in parallel
