@@ -109,9 +109,9 @@ class _ExpressionConverter(_ConverterBase):
         if self._is_enum_expr(lhs) and _is_linear_function(rhs):
             return rhs, lhs[CONSTANT]  # if comparison with enum, return enum value as threshold
 
-        raise ValueError(f'Cannot parse expression, invalid relational operation between {lhs} and {rhs}!')
+        raise ValueError(f'Cannot parse expression, non-PWL relational operation between {lhs} and {rhs}!')
 
-    def _get_pwl_tree(self, comp: Dict, true_branch: Dict, false_branch: Dict, expression: Expression = None) -> Dict:
+    def _get_pwl_tree(self, comp: Dict, true_branch: Dict, false_branch: Dict) -> Dict:
         if 'linear_and' in comp and len(comp) == 1:
             comp = comp['linear_and']  # AND of features (sum > w_sum - 0.5), see psychsim.world.World.float2value
             return {'if': (comp, sum([v for v in comp.values() if v > 0]) - 0.5, 1),
@@ -121,7 +121,7 @@ class _ExpressionConverter(_ConverterBase):
         if 'logic_and' in comp and len(comp) == 1:
             lhs, rhs = comp['logic_and']  # composes nested AND tree
             return {'if': lhs,
-                    True: self._get_pwl_tree(rhs, true_branch, false_branch, expression),
+                    True: self._get_pwl_tree(rhs, true_branch, false_branch),
                     False: false_branch}
 
         if 'linear_or' in comp and len(comp) == 1:
@@ -134,27 +134,25 @@ class _ExpressionConverter(_ConverterBase):
             lhs, rhs = comp['logic_or']  # composes nested OR tree
             return {'if': lhs,
                     True: true_branch,
-                    False: self._get_pwl_tree(rhs, true_branch, false_branch, expression)}
+                    False: self._get_pwl_tree(rhs, true_branch, false_branch)}
 
         if 'not' in comp and len(comp) == 1:
             # if NOT, just flip branches
-            return self._get_pwl_tree(comp['not'], false_branch, true_branch, expression)
+            return self._get_pwl_tree(comp['not'], false_branch, true_branch)
 
         if 'equiv' in comp:
+            # if logical EQUIVALENCE, true iff both sides are true or both are false
             lhs, rhs = comp['equiv']
-            lhs = _combine_linear_functions(lhs, _negate_linear_function(rhs))
-            return {'if': (lhs, 0, 0),  # takes equality of pwl comb in vectors (difference==0)
-                    True: true_branch,
-                    False: false_branch}
+            return self._get_pwl_tree(lhs,
+                                      self._get_pwl_tree(rhs, true_branch, false_branch),
+                                      self._get_pwl_tree(rhs, false_branch, true_branch))
 
         if 'imply' in comp:
             # if IMPLICATION, false only if left is true and right is false
             lhs, rhs = comp['imply']
-            return {'if': (lhs, 0.5, 1),  # if left is true (> 0.5)
-                    True: {'if': (rhs, 0.5, 1),  # if right is true (> 0.5)
-                           True: true_branch,
-                           False: false_branch},
-                    False: true_branch}
+            return self._get_pwl_tree(lhs,
+                                      self._get_pwl_tree(rhs, true_branch, false_branch),
+                                      true_branch)
 
         if 'eq' in comp:
             lhs, rhs = comp['eq']
@@ -211,7 +209,7 @@ class _ExpressionConverter(_ConverterBase):
                     True: true_branch,
                     False: false_branch}
 
-        raise ValueError(f'Could not parse RDDL expression "{expression}", invalid nested PWL control in "{comp}"!')
+        raise ValueError(f'Could not parse RDDL expression, unknown PWL tree comparison "{comp}"!')
 
     def _get_param_mappings(self, expression: Expression) -> List[Dict[str, str]]:
         # get mappings in the form param -> param type value for each param combination
@@ -411,11 +409,6 @@ class _ExpressionConverter(_ConverterBase):
                 return {CONSTANT: bool(rhs_const) == bool(lhs_const)}  # equal booleans
             if rhs == lhs:  # equal dicts
                 return {CONSTANT: True}
-
-            # left and right have to be single variables
-            assert len(lhs) == 1 and _is_linear_function(lhs) and \
-                   len(rhs) == 1 and _is_linear_function(rhs), \
-                f'Could not parse boolean expression "{expression}", invalid PWL equivalence composition!'
             return {'equiv': (lhs, rhs)}  # defer for later processing
 
         if b_type == '=>':
@@ -429,14 +422,7 @@ class _ExpressionConverter(_ConverterBase):
             if isinstance(rhs_const, float):
                 if bool(rhs_const):
                     return {CONSTANT: True}  # right is true, so implication is true
-                if _is_linear_function(lhs):
-                    return {'not': lhs}  # right is false, negate left
-                return {'imply': lhs}  # defer for later processing
-
-            # left and right have to be single variables
-            assert len(lhs) == 1 and _is_linear_function(lhs) and \
-                   len(rhs) == 1 and _is_linear_function(rhs), \
-                f'Could not parse boolean expression "{expression}", invalid PWL equivalence composition!'
+                return {'not': lhs}  # right is false, negate left
             return {'imply': (lhs, rhs)}  # defer for later processing
 
         raise NotImplementedError(f'Cannot parse boolean expression: "{expression}" of type "{b_type}"!')
@@ -537,7 +523,7 @@ class _ExpressionConverter(_ConverterBase):
             cond = self._convert_expression(expression.args[0], param_map)
             true_branch = self._convert_expression(expression.args[1], param_map)
             false_branch = self._convert_expression(expression.args[2], param_map)
-            return self._get_pwl_tree(cond, true_branch, false_branch, expression)
+            return self._get_pwl_tree(cond, true_branch, false_branch)
 
         if c_type == 'switch':
             assert len(expression.args) > 1, f'Cannot parse switch expression: "{expression}", no cases provided!'

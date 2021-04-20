@@ -984,23 +984,56 @@ class TestBoolean(unittest.TestCase):
         p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
 
-    def test_equiv_invalid(self):
+    def test_equiv_triple(self):
         rddl = '''
         domain my_test {
             pvariables { 
                 p : { state-fluent,  bool, default = false };
                 q : { state-fluent,  bool, default = false };
+                r : { state-fluent,  bool, default = true };
                 a : { action-fluent, bool, default = false }; 
             };
-            cpfs { p' = p <=> q <=> p; }; // only pairwise equivalence allowed
+            cpfs { p' = (p <=> q) <=> r; };
             reward = 0;
         }
         non-fluents my_test_empty { domain = my_test; }
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        with self.assertRaises(AssertionError):
-            conv.convert_str(rddl)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        q = conv.world.getState(WORLD, 'q', unique=True)
+        r = conv.world.getState(WORLD, 'r', unique=True)
+        self.assertEqual(p, False)
+        self.assertEqual(q, False)
+        self.assertEqual(r, True)
+        conv.world.step()
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p, True)
+
+    def test_equiv_rel(self):
+        rddl = '''
+        domain my_test {
+            pvariables { 
+                p : { state-fluent,  bool, default = false };
+                q : { state-fluent,  int, default = 1 };
+                a : { action-fluent, bool, default = false }; 
+            };
+            cpfs { p' = (q >= 2) <=> (q < 0); };
+            reward = 0;
+        }
+        non-fluents my_test_empty { domain = my_test; }
+        instance my_test_inst { domain = my_test; init-state { a; }; }
+        '''
+        conv = Converter()
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p, False)
+        conv.world.step()
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        q = conv.world.getState(WORLD, 'q', unique=True)
+        self.assertEqual(p, True)
+        self.assertEqual(q, 1)
 
     def test_imply_false(self):
         rddl = '''
@@ -1216,23 +1249,56 @@ class TestBoolean(unittest.TestCase):
         p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
 
-    def test_imply_invalid(self):
+    def test_imply_triple(self):
         rddl = '''
         domain my_test {
             pvariables { 
                 p : { state-fluent,  bool, default = false };
-                q : { state-fluent,  bool, default = false };
+                q : { state-fluent,  bool, default = true };
+                r : { state-fluent,  bool, default = false };
                 a : { action-fluent, bool, default = false }; 
             };
-            cpfs { p' = p => q => p; }; // only pairwise implies allowed
+            cpfs { p' = (p => q) => r; }; 
             reward = 0;
         }
         non-fluents my_test_empty { domain = my_test; }
         instance my_test_inst { domain = my_test; init-state { a; }; }
         '''
         conv = Converter()
-        with self.assertRaises(AssertionError):
-            conv.convert_str(rddl)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        q = conv.world.getState(WORLD, 'q', unique=True)
+        r = conv.world.getState(WORLD, 'r', unique=True)
+        self.assertEqual(p, False)
+        self.assertEqual(q, True)
+        self.assertEqual(r, False)
+        conv.world.step()
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p, False)
+
+    def test_imply_rel(self):
+        rddl = '''
+        domain my_test {
+            pvariables { 
+                p : { state-fluent,  bool, default = true };
+                q : { state-fluent,  int, default = 2 };
+                a : { action-fluent, bool, default = false }; 
+            };
+            cpfs { p' = (q >= 2) => (q < 0); };
+            reward = 0;
+        }
+        non-fluents my_test_empty { domain = my_test; }
+        instance my_test_inst { domain = my_test; init-state { a; }; }
+        '''
+        conv = Converter()
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p, True)
+        conv.world.step()
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        q = conv.world.getState(WORLD, 'q', unique=True)
+        self.assertEqual(p, False)
+        self.assertEqual(q, 2)
 
 
 if __name__ == '__main__':
