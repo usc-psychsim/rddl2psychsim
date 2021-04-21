@@ -82,6 +82,33 @@ class TestRelational(unittest.TestCase):
         p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, q if (q > r) else r)
 
+    def test_if_action(self):
+        rddl = '''
+                domain my_test {
+                    pvariables { 
+                        p : { state-fluent,  int, default = 0 };
+                        q : { state-fluent,  int, default = -3 };
+                        r : { state-fluent,  int, default = 4 };
+                        a : { action-fluent, bool, default = false }; 
+                    };
+                    cpfs { p' = if (a) then q else r; };
+                    reward = 0;
+                }
+                non-fluents my_test_empty { domain = my_test; }
+                instance my_test_inst { domain = my_test; init-state { a; }; }
+                '''
+        conv = Converter()
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        q = conv.world.getState(WORLD, 'q', unique=True)
+        r = conv.world.getState(WORLD, 'r', unique=True)
+        self.assertEqual(p, 0)
+        self.assertEqual(q, -3)
+        self.assertEqual(r, 4)
+        conv.world.step()
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p, q)
+
     def test_if_enum(self):
         rddl = '''
                 domain my_test {

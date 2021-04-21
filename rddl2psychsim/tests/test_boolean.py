@@ -1300,6 +1300,30 @@ class TestBoolean(unittest.TestCase):
         self.assertEqual(p, False)
         self.assertEqual(q, 2)
 
+    def test_imply_action(self):
+        rddl = '''
+                domain my_test {
+                    pvariables { 
+                        p : { state-fluent,  bool, default = true };
+                        q : { state-fluent,  bool, default = true };
+                        a : { action-fluent, bool, default = false }; 
+                    };
+                    cpfs { p' = q => ~ a; };
+                    reward = 0;
+                }
+                non-fluents my_test_empty { domain = my_test; }
+                instance my_test_inst { domain = my_test; init-state { a; }; }
+                '''
+        conv = Converter()
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        q = conv.world.getState(WORLD, 'q', unique=True)
+        self.assertEqual(p, True)
+        self.assertEqual(q, True)
+        conv.world.step()
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p, False)
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -15,7 +15,7 @@
 - reals, converted to python floats
 - enumerated values via the definition in `types`. Note: enums have no boolean or arithmetic evaluation, but can be used as constants in variable attribution and in relational expressions
 
-## Logical expressions
+## Logical Expressions
 
 - And (`^`)
 
@@ -38,7 +38,7 @@
     - sub-expression can be of arithmetic, boolean or relational type, but *not* a control statement (`if`, ` switch`)
     - depending on the sub-expression type, a different underlying PWL tree representation will be created. Namely, numerical and boolean expressions (linear functions) will be used to build a single PWL tree, while relational expressions will be converted in nested `if` statements
 
-## Arithmetic expressions
+## Arithmetic Expressions
 
 - Sum (`+`) and Subtraction(`-`) can be used arbitrarily between numerical constants and variables (fluents)
 
@@ -77,7 +77,7 @@
   - the `switch` expression, as well as the `case` conditions can be any arithmetic expression, however depending on the expression type a different underlying PWL tree representation will be created. Namely, constant conditional values will be used to build a single PWL tree, while expressions involving variables (fluents) will be converted in (possibly nested) `if` statements
   - `default` branch specification is *always* required
 
-## Probability distributions
+## Probability Distributions
 
 Creates a deterministic/stochastic effect for the following distributions:
 
@@ -126,3 +126,10 @@ Creates a deterministic/stochastic effect for the following distributions:
   - the distribution is approximated via a Normal distribution $\mathcal{N}(\lambda,\sqrt{\hat{\lambda}})$, where $\hat{\lambda}$ is the expected rate of Poisson distributions for this domain. This parameter can be defined via  `poisson_exp_rate{INT_VAL}` in the `requirements` section
   - due to this approximation, sampling from the distribution might return a value in $\mathbb{R}$ rather than $\mathbb{N}$, so further adjustments might be required
 
+## State and Action Constraints
+
+The converter supports state and action constraints as defined in the `state-action-constraints` section. However, these are treated as *assertions* rather than something that the converter uses to actively constrain PsychSim dynamics, features, etc.
+
+Constraints involving constants / non-fluents are verified at conversion time, while other constraints, possibly involving actions, are verified by calling the `verify_constraints()` method of the converter object.
+
+If the converter constructor is invoked with `const_as_assert=True` (default), then an `AssertionError` is thrown whenever a constraint is unsatisfied, otherwise a message is sent via `logging.info`.
