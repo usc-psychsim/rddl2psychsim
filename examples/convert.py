@@ -41,6 +41,7 @@ if __name__ == '__main__':
         logging.info(f'Step {i}:')
         conv.world.step(threshold=args.threshold, select=args.select)
         conv.log_state()
+        conv.verify_constraints()
 
     logging.info('==================================================')
     logging.info('Done!')

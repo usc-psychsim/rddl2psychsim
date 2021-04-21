@@ -2,7 +2,6 @@ import logging
 import math
 from typing import Dict, Tuple, Union, List
 from pyrddl.expr import Expression
-from psychsim.agent import Agent
 from psychsim.pwl import CONSTANT, actionKey
 from rddl2psychsim.conversion import _ConverterBase
 
@@ -198,7 +197,7 @@ class _ExpressionConverter(_ConverterBase):
 
         if 'action' in comp and len(comp['action']) == 2:
             agent, action = comp['action']
-            return {'if': ({actionKey(agent.name): 1.}, action, 0),  # conditional on specific agent's action
+            return {'if': ({actionKey(agent.name): 1}, action, 0),  # conditional on specific agent's action
                     True: true_branch,
                     False: false_branch}
 
