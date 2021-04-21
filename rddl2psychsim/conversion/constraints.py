@@ -1,7 +1,7 @@
 import logging
 from typing import Dict
 from pyrddl.expr import Expression
-from psychsim.pwl import KeyedTree, makeFuture, makeTree, CONSTANT
+from psychsim.pwl import KeyedTree, makeFuture, makeTree, CONSTANT, KeyedPlane, KeyedVector
 from rddl2psychsim.conversion.dynamics import _DynamicsConverter
 from rddl2psychsim.conversion.expression import _get_const_val
 
@@ -48,6 +48,18 @@ class _ConstraintsConverter(_DynamicsConverter):
                     if self._const_as_assert:
                         raise AssertionError(err_msg)
                     logging.info(err_msg)
+                continue
+
+            # check for action legality constraint in the form "action => constraint"
+            if 'imply' in expr and 'action' in expr['imply'][0]:
+                agent = expr['imply'][0]['action'][0]
+                action = expr['imply'][0]['action'][1]
+                legal_tree = self._get_pwl_tree(expr['imply'][1], True, False)  # get condition expression as if tree
+                weights, threshold, comp = legal_tree['if']
+                legal_tree = {'if': KeyedPlane(KeyedVector(weights), threshold, comp),
+                              True: legal_tree[True],
+                              False: legal_tree[False]}
+                agent.legal[action] = makeTree(legal_tree).desymbolize(self.world.symbols)
                 continue
 
             # otherwise store dynamics tree for a boolean variable, for later online assertion
