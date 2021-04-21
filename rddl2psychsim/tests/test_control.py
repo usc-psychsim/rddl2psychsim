@@ -1,5 +1,5 @@
 import unittest
-from psychsim.pwl import WORLD
+from psychsim.pwl import WORLD, actionKey
 from rddl2psychsim.conversion.converter import Converter
 
 __author__ = 'Pedro Sequeira'
@@ -108,6 +108,44 @@ class TestRelational(unittest.TestCase):
         conv.world.step()
         p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, q)
+
+    def test_if_action_choice(self):
+        rddl = '''
+                domain my_test {
+                    pvariables { 
+                        p : { state-fluent,  int, default = 0 };
+                        q : { state-fluent,  int, default = 1 };
+                        a1 : { action-fluent, bool, default = false }; 
+                        a2 : { action-fluent, bool, default = false }; 
+                    };
+                    cpfs { p' = if (a1') then
+                                    if (q > 1) then
+                                        p + 1
+                                    else 
+                                        5
+                                else if (a2') then
+                                    if (q <= 1) then
+                                        p - 1
+                                    else 
+                                        7
+                                else
+                                    9;
+                    };
+                    reward = -p;
+                }
+                non-fluents my_test_empty { domain = my_test; }
+                instance my_test_inst { domain = my_test; init-state { a1; }; horizon  = 2; }
+                '''
+        conv = Converter(const_as_assert=True)
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p, 0)
+        conv.world.step()
+        ag_name = next(iter(conv.world.agents.keys()))
+        a = conv.world.getFeature(actionKey(ag_name), unique=True)
+        self.assertEqual(a, conv.actions[ag_name]['a2'])
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p, -1)
 
     def test_if_enum(self):
         rddl = '''

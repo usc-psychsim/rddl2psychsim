@@ -2,7 +2,7 @@ import logging
 import math
 from typing import Dict, Tuple, Union, List
 from pyrddl.expr import Expression
-from psychsim.pwl import CONSTANT, actionKey
+from psychsim.pwl import CONSTANT, actionKey, makeFuture
 from rddl2psychsim.conversion import _ConverterBase
 
 __author__ = 'Pedro Sequeira'
@@ -110,7 +110,7 @@ class _ExpressionConverter(_ConverterBase):
 
         raise ValueError(f'Cannot parse expression, non-PWL relational operation between {lhs} and {rhs}!')
 
-    def _get_pwl_tree(self, comp: Dict, true_branch: Dict, false_branch: Dict) -> Dict:
+    def _get_pwl_tree(self, comp: Dict, true_branch, false_branch) -> Dict:
         if 'linear_and' in comp and len(comp) == 1:
             comp = comp['linear_and']  # AND of features (sum > w_sum - 0.5), see psychsim.world.World.float2value
             return {'if': (comp, sum([v for v in comp.values() if v > 0]) - 0.5, 1),
@@ -195,9 +195,10 @@ class _ExpressionConverter(_ConverterBase):
                     True: false_branch,  # then switch branches
                     False: true_branch}
 
-        if 'action' in comp and len(comp['action']) == 2:
-            agent, action = comp['action']
-            return {'if': ({actionKey(agent.name): 1}, action, 0),  # conditional on specific agent's action
+        if 'action' in comp and len(comp['action']) == 3:
+            agent, action, future = comp['action']
+            key = makeFuture(actionKey(agent.name)) if future else actionKey(agent.name)  # check future vs prev action
+            return {'if': ({key: 1}, action, 0),  # conditional on specific agent's action
                     True: true_branch,
                     False: false_branch}
 
@@ -251,7 +252,8 @@ class _ExpressionConverter(_ConverterBase):
             ag_actions = []
             for agent in self.world.agents.values():
                 if self._is_action(name, agent):
-                    ag_actions.append((agent, self._get_action(name, agent)))  # identify this an agent's action
+                    future = '\'' in name[0]
+                    ag_actions.append((agent, self._get_action(name, agent), future))  # identify this as agent's action
             if len(ag_actions) > 0:
                 # TODO can do plane disjunction when supported in PsychSim
                 # creates OR nested tree for matching any agents' actions
