@@ -1,5 +1,5 @@
 import unittest
-from psychsim.pwl import WORLD, actionKey
+from psychsim.pwl import WORLD, actionKey, stateKey
 from rddl2psychsim.conversion.converter import Converter
 
 __author__ = 'Pedro Sequeira'
@@ -118,16 +118,10 @@ class TestRelational(unittest.TestCase):
                         a1 : { action-fluent, bool, default = false }; 
                         a2 : { action-fluent, bool, default = false }; 
                     };
-                    cpfs { p' = if (a1') then
-                                    if (q > 1) then
-                                        p + 1
-                                    else 
-                                        5
-                                else if (a2') then
-                                    if (q <= 1) then
-                                        p - 1
-                                    else 
-                                        7
+                    cpfs { p' = if (a1) then
+                                    p + 1
+                                else if (a2) then
+                                    p - 1
                                 else
                                     9;
                     };
@@ -146,6 +140,45 @@ class TestRelational(unittest.TestCase):
         self.assertEqual(a, conv.actions[ag_name]['a2'])
         p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, -1)
+
+    def test_if_action_dynamics(self):
+        rddl = '''
+                domain my_test {
+                    pvariables { 
+                        p : { state-fluent,  int, default = 0 };
+                        q : { state-fluent,  int, default = 1 };
+                        a1 : { action-fluent, bool, default = false }; 
+                        a2 : { action-fluent, bool, default = false }; 
+                    };
+                    cpfs { p' = if (a1) then
+                                    p + 1
+                                else if (a2) then
+                                    p - 1
+                                else
+                                    0;
+                    };
+                    reward = -p;
+                }
+                non-fluents my_test_empty { domain = my_test; }
+                instance my_test_inst { domain = my_test; init-state { a1; }; horizon  = 2; }
+                '''
+        conv = Converter(const_as_assert=True)
+        conv.convert_str(rddl)
+        conv.world.step()
+        ag_name = next(iter(conv.world.agents.keys()))
+        a = conv.world.getFeature(actionKey(ag_name), unique=True)
+        a1 = conv.actions[ag_name]['a1']
+        a2 = conv.actions[ag_name]['a2']
+        p = stateKey(WORLD, 'p')
+        self.assertIn(a1, conv.world.dynamics)
+        self.assertIn(a2, conv.world.dynamics)
+        self.assertIn(True, conv.world.dynamics)
+        self.assertIn(p, conv.world.dynamics[a1])
+        self.assertIn(p, conv.world.dynamics[a2])
+        self.assertIn(p, conv.world.dynamics[True])
+        self.assertIn(a1, conv.world.dynamics[p])
+        self.assertIn(a2, conv.world.dynamics[p])
+        self.assertIn(True, conv.world.dynamics[p])
 
     def test_if_enum(self):
         rddl = '''

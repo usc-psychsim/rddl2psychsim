@@ -2,7 +2,7 @@ import logging
 import math
 from typing import Dict, Tuple, Union, List
 from pyrddl.expr import Expression
-from psychsim.pwl import CONSTANT, actionKey, makeFuture
+from psychsim.pwl import CONSTANT
 from rddl2psychsim.conversion import _ConverterBase
 
 __author__ = 'Pedro Sequeira'
@@ -109,107 +109,6 @@ class _ExpressionConverter(_ConverterBase):
             return rhs, lhs[CONSTANT]  # if comparison with enum, return enum value as threshold
 
         raise ValueError(f'Cannot parse expression, non-PWL relational operation between {lhs} and {rhs}!')
-
-    def _get_pwl_tree(self, comp: Dict, true_branch, false_branch) -> Dict:
-        if 'linear_and' in comp and len(comp) == 1:
-            comp = comp['linear_and']  # AND of features (sum > w_sum - 0.5), see psychsim.world.World.float2value
-            return {'if': (comp, sum([v for v in comp.values() if v > 0]) - 0.5, 1),
-                    True: true_branch,
-                    False: false_branch}
-
-        if 'logic_and' in comp and len(comp) == 1:
-            lhs, rhs = comp['logic_and']  # composes nested AND tree
-            return {'if': lhs,
-                    True: self._get_pwl_tree(rhs, true_branch, false_branch),
-                    False: false_branch}
-
-        if 'linear_or' in comp and len(comp) == 1:
-            comp = comp['linear_or']  # OR of features (A | B) <=> ~(~A ^ ~B)
-            return self._get_pwl_tree({'linear_and': _negate_linear_function(comp)},
-                                      false_branch,  # switch branches
-                                      true_branch)
-
-        if 'logic_or' in comp and len(comp) == 1:
-            lhs, rhs = comp['logic_or']  # composes nested OR tree
-            return {'if': lhs,
-                    True: true_branch,
-                    False: self._get_pwl_tree(rhs, true_branch, false_branch)}
-
-        if 'not' in comp and len(comp) == 1:
-            # if NOT, just flip branches
-            return self._get_pwl_tree(comp['not'], false_branch, true_branch)
-
-        if 'equiv' in comp:
-            # if logical EQUIVALENCE, true iff both sides are true or both are false
-            lhs, rhs = comp['equiv']
-            return self._get_pwl_tree(lhs,
-                                      self._get_pwl_tree(rhs, true_branch, false_branch),
-                                      self._get_pwl_tree(rhs, false_branch, true_branch))
-
-        if 'imply' in comp:
-            # if IMPLICATION, false only if left is true and right is false
-            lhs, rhs = comp['imply']
-            return self._get_pwl_tree(lhs,
-                                      self._get_pwl_tree(rhs, true_branch, false_branch),
-                                      true_branch)
-
-        if 'eq' in comp:
-            lhs, rhs = comp['eq']
-            op, thresh = self._get_relational_plane_thresh(lhs, rhs)
-            return {'if': (op, thresh, 0),  # takes equality of pwl comb in vectors (difference==0)
-                    True: true_branch,
-                    False: false_branch}
-
-        if 'neq' in comp:
-            lhs, rhs = comp['neq']
-            op, thresh = self._get_relational_plane_thresh(lhs, rhs)
-            return {'if': (op, thresh, 0),  # takes equality of pwl comb in vectors (difference==0)
-                    True: false_branch,  # then switch branches
-                    False: true_branch}
-
-        if 'gt' in comp:
-            lhs, rhs = comp['gt']
-            op, thresh = self._get_relational_plane_thresh(lhs, rhs)
-            return {'if': (op, thresh, 1),  # takes diff of pwl comb in vectors (difference>0)
-                    True: true_branch,
-                    False: false_branch}
-
-        if 'lt' in comp:
-            lhs, rhs = comp['lt']
-            op, thresh = self._get_relational_plane_thresh(lhs, rhs)
-            return {'if': (op, thresh, -1),  # takes diff of pwl comb in vectors (difference<0)
-                    True: true_branch,
-                    False: false_branch}
-
-        if 'geq' in comp:
-            lhs, rhs = comp['geq']
-            op, thresh = self._get_relational_plane_thresh(lhs, rhs)
-            return {'if': (op, thresh, -1),  # takes diff of pwl comb in vectors (difference<0)
-                    True: false_branch,  # then switch branches
-                    False: true_branch}
-
-        if 'leq' in comp:
-            lhs, rhs = comp['leq']
-            op, thresh = self._get_relational_plane_thresh(lhs, rhs)
-            return {'if': (op, thresh, 1),  # takes diff of pwl comb in vectors (difference>0)
-                    True: false_branch,  # then switch branches
-                    False: true_branch}
-
-        if 'action' in comp and len(comp['action']) == 3:
-            agent, action, future = comp['action']
-            key = makeFuture(actionKey(agent.name)) if future else actionKey(agent.name)  # check future vs prev action
-            return {'if': ({key: 1}, action, 0),  # conditional on specific agent's action
-                    True: true_branch,
-                    False: false_branch}
-
-        if _is_linear_function(comp):
-            # default: assumes linear combination of all features in vector has to be > 0.5,
-            # which is truth value in PsychSim (see psychsim.world.World.float2value)
-            return {'if': (comp, 0.5, 1),
-                    True: true_branch,
-                    False: false_branch}
-
-        raise ValueError(f'Could not parse RDDL expression, unknown PWL tree comparison "{comp}"!')
 
     def _get_param_mappings(self, expression: Expression) -> List[Dict[str, str]]:
         # get mappings in the form param -> param type value for each param combination
@@ -524,7 +423,7 @@ class _ExpressionConverter(_ConverterBase):
             cond = self._convert_expression(expression.args[0], param_map)
             true_branch = self._convert_expression(expression.args[1], param_map)
             false_branch = self._convert_expression(expression.args[2], param_map)
-            return self._get_pwl_tree(cond, true_branch, false_branch)
+            return {'if': cond, True: true_branch, False: false_branch}
 
         if c_type == 'switch':
             assert len(expression.args) > 1, f'Cannot parse switch expression: "{expression}", no cases provided!'

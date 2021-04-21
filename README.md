@@ -128,8 +128,30 @@ Creates a deterministic/stochastic effect for the following distributions:
 
 ## State and Action Constraints
 
-The converter supports state and action constraints as defined in the `state-action-constraints` section. However, these are treated as *assertions* rather than something that the converter uses to actively constrain PsychSim dynamics, features, etc.
+The converter supports state and action constraints as defined in the `state-action-constraints` section. However, *most* are treated as *assertions* rather than something that the converter uses to actively constrain PsychSim dynamics, features, etc. 
 
 Constraints involving constants / non-fluents are verified at conversion time, while other constraints, possibly involving actions, are verified by calling the `verify_constraints()` method of the converter object.
 
 If the converter constructor is invoked with `const_as_assert=True` (default), then an `AssertionError` is thrown whenever a constraint is unsatisfied, otherwise a message is sent via `logging.info`.
+
+### Action Legality
+
+One special type of constraint defines the legality of actions. This can be achieved through *implication* expressions in the form `action => legal_expression`. For example, if `act => p <= 1;` is provided in the constraints section, then action `act` will be legal *iff* feature `p` is less than or equal to 1.
+
+<u>Note:</u> currently we can set legality only to non-parameterized actions.
+
+## Action-Conditioned Dynamics
+
+Usually, dynamics to update a fluent defined inside the `cpfs` section of a RDDL domain are assigned to the "world" in PsychSim after conversion, meaning that the corresponding feature dynamics is evaluated at each time step. However, for greater efficiency, we can set dynamics conditioned on the execution of some action. 
+
+This is achieved by having `if` statements, where the action is the only element in the condition expression, i.e., expressions in the form: `if (act) then act_dyn_expr else world_dyn_exp`. This means that `act_dyn_expr` is only going to be evaluated when action `act` is executed, otherwise `world_dyn_exp` will be used to update the feature's value. We can define multiple action-dependent dynamics for the same feature by using nested if's, e.g.:
+
+```yacas
+x' = if (go_right) then
+		x + 1
+	else if (go_left) then
+		x - 1
+	else
+		x;
+```
+
