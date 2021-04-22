@@ -1,3 +1,27 @@
+> RDDL2PsychSim is a python framework for converting RDDL domains into PsychSim    
+
+[TOC]
+
+# Introduction
+
+## Installation
+
+```bash
+pip install git+https://github.com/usc-psychsim/rddl2psychsim.git
+```
+
+This will install the `rddl2psychsim` package in the current python environment as well as all required packages.
+
+## Requirements
+
+- PsychSim: https://github.com/usc-psychsim/
+- pyrddl: https://github.com/usc-psychsim/pyrddl.git (forked from original repository at https://github.com/thiagopbueno/pyrddl to support more language elements)
+- NumPy: https://numpy.org/
+
+## Usage
+
+TODO
+
 # Supported Language Elements
 
 ## Fluents (variables)
@@ -6,7 +30,7 @@
 - ` state-fluent`, `interm-fluent`, and `observ-fluent`, all converted into PsychSim features
   - <u>Note:</u> `observ-fluent` variables are automatically added to agent's `omega` if `partially-observed` is specified in the `requirements` section
 - `action-fluent`, converted into PsychSim action
-- Supports parameterized (n-arity) predicates
+- Supports parameterized (n-arity) predicates by creating state features in PsychSim for all combinations of the parameters in the provided instance
 
 ## Constants
 
@@ -136,15 +160,16 @@ If the converter constructor is invoked with `const_as_assert=True` (default), t
 
 ### Action Legality
 
-One special type of constraint defines the legality of actions. This can be achieved through *implication* expressions in the form `action => legal_expression`. For example, if `act => p <= 1;` is provided in the constraints section, then action `act` will be legal *iff* feature `p` is less than or equal to 1.
+One special type of constraints in the `state-action-constraints` allows defining legality conditions for actions:
 
-<u>Note:</u> currently we can set legality only to non-parameterized actions.
+- For non-parameterized actions, this can be achieved through *implication* expressions in the form: `action => legality_expression`. For example, if `act => p <= 1;` is provided in the constraints section, then action `act` will be legal *iff* feature `p` is less than or equal to 1
+- Similarly, for parameterized actions, one can define constraints in the form `forall_{?o: obj}[ action(?o) => legality_expresion ];` 
 
 ## Action-Conditioned Dynamics
 
-Usually, dynamics to update a fluent defined inside the `cpfs` section of a RDDL domain are assigned to the "world" in PsychSim after conversion, meaning that the corresponding feature dynamics is evaluated at each time step. However, for greater efficiency, we can set dynamics conditioned on the execution of some action. 
+Usually, dynamics to update a fluent defined inside the `cpfs` section of a RDDL domain are assigned to the "world" in PsychSim after conversion, meaning that the corresponding feature dynamics are evaluated at each time step. However, for better efficiency, one can set dynamics conditioned on the execution of some action. This can reduce the number of actions available to the agent at each step.
 
-This is achieved by having `if` statements, where the action is the only element in the condition expression, i.e., expressions in the form: `if (act) then act_dyn_expr else world_dyn_exp`. This means that `act_dyn_expr` is only going to be evaluated when action `act` is executed, otherwise `world_dyn_exp` will be used to update the feature's value. We can define multiple action-dependent dynamics for the same feature by using nested if's, e.g.:
+This is achieved by having `if` statements in the dynamics expressions of fluents where the action is the only element in the condition expression, i.e., expressions in the form: `if (act) then act_dyn_expr else world_dyn_exp`. This means that `act_dyn_expr` is only going to be evaluated when action `act` is executed, otherwise `world_dyn_exp` will be used to update the feature's value. We can define multiple action-dependent dynamics for the same feature by using nested if's, e.g.:
 
 ```yacas
 x' = if (go_right) then
@@ -155,3 +180,9 @@ x' = if (go_right) then
 		x;
 ```
 
+# References
+
+- RDDL manual: http://users.cecs.anu.edu.au/~ssanner/IPPC_2011/RDDL.pdf
+- RDDL Tutorial: https://sites.google.com/site/rddltutorial/rddl-language-discription
+- PsychSim repository: https://github.com/usc-psychsim/
+- PsychSim manual: https://psychsim.readthedocs.io/
