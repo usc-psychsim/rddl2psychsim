@@ -75,6 +75,8 @@ class _ConstraintsConverter(_DynamicsConverter):
             self._constraint_trees[tree] = constraint
             logging.info(f'Added dynamic state constraint:\n{tree}')
 
+        logging.info(f'Total {len(self._constraint_trees)} constraints created')
+
     def _set_action_legality(self, expr: Dict) -> bool:
         # check for action legality constraint in the form "action => constraint"
         if 'imply' in expr and 'action' in expr['imply'][0]:
@@ -85,8 +87,9 @@ class _ConstraintsConverter(_DynamicsConverter):
             legal_tree = {'if': KeyedPlane(KeyedVector(weights), threshold, comp),
                           True: legal_tree[True],
                           False: legal_tree[False]}
-            agent.legal[action] = makeTree(legal_tree).desymbolize(self.world.symbols)
-            logging.info(f'Set action legality constraint for action "{action}" to:\n{legal_tree}')
+            legal_tree = makeTree(legal_tree)
+            logging.info(f'Set legality constraint for action "{action}" to:\n{legal_tree}')
+            agent.legal[action] = legal_tree.desymbolize(self.world.symbols)
             return True
 
         return False  # could not find action legality constraint in the expression

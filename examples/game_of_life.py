@@ -3,7 +3,7 @@ import argparse
 import logging
 import numpy as np
 from tqdm import tqdm
-from psychsim.pwl import actionKey, WORLD
+from psychsim.pwl import actionKey, WORLD, rewardKey
 from rddl2psychsim.conversion.converter import Converter
 
 __author__ = 'Pedro Sequeira'
@@ -26,7 +26,9 @@ def print_state():
             y_obj = y_objs[y]
             f_name = Converter.get_fluent_name(('alive', x_obj, y_obj))
             state[x, y] = int(conv.world.getState(WORLD, f_name, unique=True))
-    logging.info(f'Action: {conv.world.getFeature(actionKey(next(iter(conv.world.agents.keys()))), unique=True)}')
+    agent = next(iter(conv.world.agents.keys()))
+    logging.info(f'Action: {conv.world.getFeature(actionKey(agent), unique=True)}')
+    logging.info(f'Reward: {conv.world.getFeature(rewardKey(agent), unique=True)}')
     logging.info(f'\n{state}')
 
 
@@ -52,8 +54,9 @@ if __name__ == '__main__':
     for i in tqdm(range(args.steps), ):
         logging.info('\n__________________________________________________')
         logging.info(f'Step {i}:')
-        conv.world.step(select=True)
+        conv.world.step(select=True, threshold=0.01)
         print_state()
+        conv.verify_constraints()
 
     logging.info('==================================================')
     logging.info('Done!')

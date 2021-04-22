@@ -4,6 +4,9 @@
 // generating patterns that keep the most cells alive.
 //
 // Author: Scott Sanner (ssanner [at] gmail.com)
+// Modified by Pedro Sequeira (pedrodbs [at] gmail.com) to
+//          support PsychSim conversion (action conditioned dynamics
+//          and legality).
 ////////////////////////////////////////////////////////////////////
 domain game_of_life_stoch {
   	
@@ -41,13 +44,25 @@ domain game_of_life_stoch {
 		count-neighbors(?x,?y) = KronDelta(sum_{?x2 : x_pos, ?y2 : y_pos} [NEIGHBOR(?x,?y,?x2,?y2) ^ alive(?x2,?y2)]);
 
 		// Stochastically determine whether cell (?x,?y) is alive in next state
-		alive'(?x,?y) = if (forall_{?y2 : y_pos} ~alive(?x,?y2))
-						then Bernoulli(PROB_REGENERATE) // Rule 6
+		//alive'(?x,?y) = if (forall_{?y2 : y_pos} ~alive(?x,?y2))
+		//				then Bernoulli(PROB_REGENERATE) // Rule 6
+        //
+		//				else if ([alive(?x,?y) ^ (count-neighbors(?x,?y) >= 2)
+		//						^ (count-neighbors(?x,?y) <= 3)]
+		//				    | [~alive(?x,?y) ^ (count-neighbors(?x,?y) == 3)]
+		//				    | set(?x,?y))
+		//				then Bernoulli(PROB_REGENERATE)
+		//				else Bernoulli(1.0 - PROB_REGENERATE);
 
-						else if ([alive(?x,?y) ^ (count-neighbors(?x,?y) >= 2) 
-								^ (count-neighbors(?x,?y) <= 3)]
-						    | [~alive(?x,?y) ^ (count-neighbors(?x,?y) == 3)]
-						    | set(?x,?y))
+		alive'(?x,?y) = if ( set(?x,?y) )
+		                then Bernoulli(PROB_REGENERATE)
+
+                        else if (forall_{?y2 : y_pos} ~alive(?x,?y2))
+                        then Bernoulli(PROB_REGENERATE) // Rule 6
+
+						else if ([alive(?x,?y) ^ (count-neighbors(?x,?y) >= 2)
+                                ^ (count-neighbors(?x,?y) <= 3)]
+                             | [~alive(?x,?y) ^ (count-neighbors(?x,?y) == 3)])
 						then Bernoulli(PROB_REGENERATE)
 						else Bernoulli(1.0 - PROB_REGENERATE);
 	};
@@ -60,10 +75,11 @@ domain game_of_life_stoch {
 		(PROB_REGENERATE >= 0.0) ^ (PROB_REGENERATE <= 1.0); 
 		
 		// Precondition: let's say we should not set a cell if it is already alive
-		forall_{?x : x_pos, ?y : y_pos} alive(?x,?y) => ~set(?x,?y);
+		//forall_{?x : x_pos, ?y : y_pos} alive(?x,?y) => ~set(?x,?y);
+		forall_{?x : x_pos, ?y : y_pos} set(?x,?y) => ~alive(?x,?y);
 	};
 }
-   
+
 non-fluents game2x2_stoch {
 
 	domain = game_of_life_stoch;

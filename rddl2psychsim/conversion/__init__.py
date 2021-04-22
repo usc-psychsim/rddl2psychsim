@@ -176,7 +176,7 @@ class _ConverterBase(object):
                 if nf_name not in self.constants:
                     raise ValueError(f'Trying to initialize non-existing non-fluent: {nf_name}!')
                 self.constants[nf_name] = val
-                logging.info(f'Initialized constant "{nf_name}" with value "{val}"')
+                logging.info(f'Initialized constant "{nf_name}" to "{val}"')
 
         logging.info(f'Total {len(self.constants)} constants initialized')
 
@@ -268,7 +268,7 @@ class _ConverterBase(object):
             if isinstance(val, str):
                 val = val.replace('@', '')  # just in case it's an enum value
             self.world.setFeature(f, val)
-            logging.info(f'Initialized feature "{f}" with value "{val}"')
+            logging.info(f'Initialized feature "{f}" to "{val}"')
 
     def _parse_requirements_pre(self):
         logging.info('__________________________________________________')
