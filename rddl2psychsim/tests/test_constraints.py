@@ -177,6 +177,44 @@ class TestConstraints(unittest.TestCase):
         p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, -2)
 
+    def test_actions_param_legal(self):
+        objs = {'x1': True, 'x2': False, 'x3': False, 'x4': True}
+        rddl = f'''
+                domain my_test {{
+                    types {{ obj : object; }};
+                    pvariables {{ 
+                        p(obj) : {{ state-fluent, bool, default = false }};
+                        a(obj) : {{ action-fluent, bool, default = false }}; 
+                    }};
+                    cpfs {{ p(?o)' = p(?o); }};
+                    reward = 0;
+                    state-action-constraints {{ forall_{{?o : obj}}[ a(?o) => p(?o) ]; }}; 
+                }}
+                non-fluents my_test_nf {{ 
+                    domain = my_test; 
+                    objects {{ obj : {{{', '.join(objs.keys())}}}; }};
+                }}
+                instance my_test_inst {{ 
+                    domain = my_test; 
+                    init-state {{
+                        {'; '.join(f'p({o})={str(v).lower()}' for o, v in objs.items())}; 
+                    }}; 
+                }}
+                '''
+        conv = Converter(const_as_assert=True)
+        conv.convert_str(rddl)
+        conv.world.step()
+        ag_name = next(iter(conv.world.agents.keys()))
+        legal_acts = conv.world.agents[ag_name].getLegalActions()
+        for name, val in objs.items():
+            p = conv.world.getState(WORLD, Converter.get_fluent_name(('p', name)), unique=True)
+            self.assertEqual(p, val)
+            a = conv.actions[ag_name][Converter.get_fluent_name(('a', name))]
+            if val:
+                self.assertIn(a, legal_acts)
+            else:
+                self.assertNotIn(a, legal_acts)
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -1,5 +1,5 @@
 import logging
-from typing import Dict
+from typing import Dict, Tuple
 from pyrddl.expr import Expression
 from psychsim.action import ActionSet
 from psychsim.pwl import KeyedVector, rewardKey, makeTree, makeFuture, KeyedMatrix, KeyedPlane, CONSTANT, \
@@ -254,3 +254,16 @@ class _DynamicsConverter(_ExpressionConverter):
                     False: false_branch}
 
         raise ValueError(f'Could not parse RDDL expression, unknown PWL tree comparison "{comp}"!')
+
+    def _get_relational_plane_thresh(self, lhs: Dict, rhs: Dict) -> Tuple[Dict, str or int]:
+        if _is_linear_function(lhs) and _is_linear_function(rhs):
+            op = _combine_linear_functions(lhs, _negate_linear_function(rhs))
+            return op, 0  # if both sides are planes, returns difference (threshold 0)
+
+        if _is_linear_function(lhs) and self._is_enum_expr(rhs):
+            return lhs, rhs[CONSTANT]  # if comparison with enum, return enum value as threshold
+
+        if self._is_enum_expr(lhs) and _is_linear_function(rhs):
+            return rhs, lhs[CONSTANT]  # if comparison with enum, return enum value as threshold
+
+        raise ValueError(f'Cannot parse expression, non-PWL relational operation between {lhs} and {rhs}!')

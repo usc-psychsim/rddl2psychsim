@@ -1,6 +1,6 @@
 import logging
 import math
-from typing import Dict, Tuple, Union, List
+from typing import Dict, Union, List
 from pyrddl.expr import Expression
 from psychsim.pwl import CONSTANT
 from rddl2psychsim.conversion import _ConverterBase
@@ -96,19 +96,6 @@ class _ExpressionConverter(_ConverterBase):
         Returns `False` otherwise.
         """
         return isinstance(expr, dict) and len(expr) == 1 and CONSTANT in expr and self._is_enum_type(expr[CONSTANT])
-
-    def _get_relational_plane_thresh(self, lhs: Dict, rhs: Dict) -> Tuple[Dict, str or int]:
-        if _is_linear_function(lhs) and _is_linear_function(rhs):
-            op = _combine_linear_functions(lhs, _negate_linear_function(rhs))
-            return op, 0  # if both sides are planes, returns difference (threshold 0)
-
-        if _is_linear_function(lhs) and self._is_enum_expr(rhs):
-            return lhs, rhs[CONSTANT]  # if comparison with enum, return enum value as threshold
-
-        if self._is_enum_expr(lhs) and _is_linear_function(rhs):
-            return rhs, lhs[CONSTANT]  # if comparison with enum, return enum value as threshold
-
-        raise ValueError(f'Cannot parse expression, non-PWL relational operation between {lhs} and {rhs}!')
 
     def _get_param_mappings(self, expression: Expression) -> List[Dict[str, str]]:
         # get mappings in the form param -> param type value for each param combination

@@ -166,7 +166,6 @@ class TestRelational(unittest.TestCase):
         conv.convert_str(rddl)
         conv.world.step()
         ag_name = next(iter(conv.world.agents.keys()))
-        a = conv.world.getFeature(actionKey(ag_name), unique=True)
         a1 = conv.actions[ag_name]['a1']
         a2 = conv.actions[ag_name]['a2']
         p = stateKey(WORLD, 'p')
