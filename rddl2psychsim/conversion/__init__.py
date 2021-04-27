@@ -48,9 +48,9 @@ class _ConverterBase(object):
                 logging.info(f'{f}: {val}')
 
     @staticmethod
-    def get_fluent_name(f: Tuple) -> str:
+    def get_feature_name(f: Tuple) -> str:
         """
-        Gets an identifier name for the given (possibly parameterized) fluent.
+        Gets a PsychSim feature identifier name for the given (possibly parameterized) fluent.
         :param Tuple f: the (possibly parameterized) fluent, e.g., `('p', None)` or `('p', x1, y1)`.
         :rtype: str
         :return: the identifier string for the fluent.
@@ -63,22 +63,31 @@ class _ConverterBase(object):
         return str(f)
 
     def _is_feature(self, name: Tuple) -> bool:
-        return self.get_fluent_name(name) in self.features
+        return self.get_feature_name(name) in self.features
 
     def _get_feature(self, name: Tuple) -> str:
-        return self.features[self.get_fluent_name(name)]
+        return self.features[self.get_feature_name(name)]
 
     def _is_action(self, name: Tuple, agent: Agent) -> bool:
-        return agent.name in self.actions and self.get_fluent_name(name) in self.actions[agent.name]
+        return agent.name in self.actions and self.get_feature_name(name) in self.actions[agent.name]
 
     def _get_action(self, name: Tuple, agent: Agent) -> str:
-        return self.actions[agent.name][self.get_fluent_name(name)]
+        return self.actions[agent.name][self.get_feature_name(name)]
 
     def _is_constant(self, name: Tuple) -> bool:
-        return self.get_fluent_name(name) in self.constants
+        return self.get_feature_name(name) in self.constants
 
     def _get_constant_value(self, name: Tuple) -> object:
-        return self.constants[self.get_fluent_name(name)]
+        return self.constants[self.get_feature_name(name)]
+
+    def _get_entity_name(self, name: Tuple) -> Tuple[str, Tuple]:
+        name = list(name)
+        # searches for agent name in (possibly parameterized) variable's name
+        for ag_name in self.world.agents.keys():
+            if ag_name in name:
+                name.remove(ag_name)
+                return ag_name, tuple(name)
+        return WORLD, tuple(name)  # defaults to world
 
     def _is_enum(self, name: str) -> bool:
         for t, _ in self.model.domain.types:
@@ -134,8 +143,14 @@ class _ConverterBase(object):
         logging.info('__________________________________________________')
         self.world = World()
 
-        # create agents #TODO read agent(s) name(s) from RDDL? hardcoded for now
-        self.world.addAgent('AGENT')
+        # create agents from RDDL non-fluent definition, special object named "agent"
+        for p_type, p_vals in self.model.non_fluents.objects:
+            if p_type == 'agent':
+                for ag_name in p_vals:
+                    self.world.addAgent(ag_name)
+                break
+        if len(self.world.agents) == 0:
+            self.world.addAgent('AGENT')  # create default agent if no agents defined
 
         # set agents' properties from instance
         for agent in self.world.agents.values():
@@ -144,7 +159,7 @@ class _ConverterBase(object):
             if hasattr(self.model.instance, 'discount'):
                 agent.setAttribute('discount', self.model.instance.discount)
 
-            # TODO other world and agent attributes
+            # TODO other world and agent attributes?
             agent.setAttribute('selection', 'random')
 
             model = agent.get_true_model()
@@ -164,7 +179,7 @@ class _ConverterBase(object):
             else:
                 nf_combs = [(nf.name, None)]  # not-parameterized constant
             for nf_name in nf_combs:
-                nf_name = self.get_fluent_name(nf_name)
+                nf_name = self.get_feature_name(nf_name)
                 self.constants[nf_name] = nf.default
                 logging.info(f'Initialized constant "{nf_name}" with default value "{nf.default}"')
 
@@ -172,7 +187,7 @@ class _ConverterBase(object):
         if hasattr(self.model.non_fluents, 'init_non_fluent'):
             for nf, val in self.model.non_fluents.init_non_fluent:
                 nf_name = nf if nf[1] is None else (nf[0], *nf[1])
-                nf_name = self.get_fluent_name(nf_name)
+                nf_name = self.get_feature_name(nf_name)
                 if nf_name not in self.constants:
                     raise ValueError(f'Trying to initialize non-existing non-fluent: {nf_name}!')
                 self.constants[nf_name] = val
@@ -180,24 +195,25 @@ class _ConverterBase(object):
 
         logging.info(f'Total {len(self.constants)} constants initialized')
 
-    def _convert_variables(self, agent: Agent = None):
-        # create variables from state fluents
+    def _convert_variables(self):
+        # create features from state fluents
         logging.info('__________________________________________________')
         self.features = {}
         for sf in self.model.domain.state_fluents.values():
-            self._create_features(sf, agent)
+            self._create_features(sf)
 
-        # create variables from intermediate fluents
+        # create features from intermediate fluents
         for sf in self.model.domain.intermediate_fluents.values():
-            self._create_features(sf, agent)
+            self._create_features(sf)
 
-        # create variables from non-observable fluents
+        # create features from non-observable fluents
         for sf in self.model.domain.observ_fluents.values():
-            self._create_features(sf, agent)
+            self._create_features(sf)
 
         logging.info(f'Total {len(self.features)} features created')
 
-    def _create_features(self, fluent: PVariable, agent: Agent = None) -> List[str]:
+    def _create_features(self, fluent: PVariable) -> List[str]:
+        # to whom should this feature be associated, agent or world?
         if fluent.arity > 0:
             # gets all parameter combinations
             param_vals = self._get_all_param_combs(fluent.param_types)
@@ -211,10 +227,10 @@ class _ConverterBase(object):
         # create and register features
         feats = []
         domain = self._get_domain(fluent.range)
-        entity = WORLD if agent is None else agent.name
         for f_name in f_combs:
-            f_name = self.get_fluent_name(f_name)
-            f = self.world.defineState(entity, f_name, *domain)
+            entity, feat_name = self._get_entity_name(f_name)  # tries to identify agent from fluent param comb name
+            f = self.world.defineState(entity, self.get_feature_name(feat_name), *domain)
+            f_name = self.get_feature_name(f_name)  # keep feature's original name for transparent later referencing
             self.features[f_name] = f
 
             # set to default value (if list assume first of list)
@@ -230,15 +246,14 @@ class _ConverterBase(object):
         return feats
 
     def _convert_actions(self):
-        # create actions for agents # TODO assume homogeneous agents (maybe put some constraint in RDDL for diff agents)
+        # create actions for agents (assume homogeneous agents) TODO maybe put constraints in RDDL for diff agents?
         logging.info('__________________________________________________')
-        for agent in self.world.agents.values():
-            self.actions = {agent.name: {}}
-            for act_fluent in self.model.domain.action_fluents.values():
-                self._create_actions(act_fluent, agent)
-            logging.info(f'Total {len(self.actions[agent.name])} actions created for agent "{agent.name}"')
+        self.actions = {agent.name: {} for agent in self.world.agents.values()}
+        for act_fluent in self.model.domain.action_fluents.values():
+            self._create_actions(act_fluent)
+        logging.info(f'Total {sum(len(actions) for actions in self.actions.values())} actions created')
 
-    def _create_actions(self, fluent: PVariable, agent: Agent) -> List[ActionSet]:
+    def _create_actions(self, fluent: PVariable) -> List[ActionSet]:
         if fluent.arity > 0:
             # gets all parameter combinations
             param_vals = self._get_all_param_combs(fluent.param_types)
@@ -249,11 +264,19 @@ class _ConverterBase(object):
         # create action for each param combination
         actions = []
         for act_name in act_combs:
-            act_name = self.get_fluent_name(act_name)
-            action = agent.addAction({'verb': act_name})
-            actions.append(action)
-            self.actions[agent.name][act_name] = action
-            logging.info(f'Created action "{action}" from action fluent: {fluent}')
+            entity, action_name = self._get_entity_name(act_name)  # tries to identify agent from fluent param comb name
+            if entity == WORLD:
+                agents = self.world.agents.values()  # create action for all agents
+            else:
+                agents = [self.world.agents[entity]]  # create action just for this agent
+
+            for agent in agents:
+                # keep feature's original name for transparent later referencing
+                act_name = self.get_feature_name(act_name)
+                action = agent.addAction({'verb': self.get_feature_name(action_name)})
+                actions.append(action)
+                self.actions[agent.name][act_name] = action
+                logging.info(f'Created action "{action}" for agent "{agent}" from action fluent: {fluent}')
         return actions
 
     def _initialize_variables(self):

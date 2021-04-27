@@ -31,7 +31,7 @@ class _ConstraintsConverter(_DynamicsConverter):
             val = state.marginal(makeFuture(_ASSERTION_KEY)).expectation()  # expected / mean value
             # value has to be > 0.5, which is truth value in PsychSim (see psychsim.world.World.float2value)
             if val <= 0.5:
-                err_msg = f'State or action constraint "{expr}" not satisfied, returned False!'
+                err_msg = f'State or action constraint "{expr}" not satisfied given current world state:\n{state}'
                 if self._const_as_assert:
                     raise AssertionError(err_msg)
                 logging.info(err_msg)
@@ -58,7 +58,7 @@ class _ConstraintsConverter(_DynamicsConverter):
             const_val = _get_const_val(expr)
             if const_val is not None:
                 if not bool(const_val):
-                    err_msg = f'Constant state or action constraint "{constraint}" not satisfied, returned False!'
+                    err_msg = f'Constant state or action constraint "{constraint}" not satisfied!'
                     if self._const_as_assert:
                         raise AssertionError(err_msg)
                     logging.info(err_msg)

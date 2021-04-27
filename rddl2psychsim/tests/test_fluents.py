@@ -291,11 +291,11 @@ class TestTypes(unittest.TestCase):
         conv = Converter()
         conv.convert_str(rddl)
         for o, v in objs.items():
-            p = conv.world.getState(WORLD, Converter.get_fluent_name(('p', o)), unique=True)
+            p = conv.world.getState(WORLD, Converter.get_feature_name(('p', o)), unique=True)
             self.assertEqual(p, True)
         conv.world.step()
         for o, v in objs.items():
-            p = conv.world.getState(WORLD, Converter.get_fluent_name(('p', o)), unique=True)
+            p = conv.world.getState(WORLD, Converter.get_feature_name(('p', o)), unique=True)
             self.assertEqual(p, False)
 
     def test_fluent_param_init(self):
@@ -326,11 +326,11 @@ class TestTypes(unittest.TestCase):
         conv = Converter()
         conv.convert_str(rddl)
         for o, v in objs.items():
-            p = conv.world.getState(WORLD, Converter.get_fluent_name(('p', o)), unique=True)
+            p = conv.world.getState(WORLD, Converter.get_feature_name(('p', o)), unique=True)
             self.assertEqual(p, v)
         conv.world.step()
         for o, v in objs.items():
-            p = conv.world.getState(WORLD, Converter.get_fluent_name(('p', o)), unique=True)
+            p = conv.world.getState(WORLD, Converter.get_feature_name(('p', o)), unique=True)
             self.assertEqual(p, False)
 
     def test_fluent_multi_param_init(self):
@@ -364,11 +364,11 @@ class TestTypes(unittest.TestCase):
         conv = Converter()
         conv.convert_str(rddl)
         for o, v in objs.items():
-            p = conv.world.getState(WORLD, Converter.get_fluent_name(('p', *o)), unique=True)
+            p = conv.world.getState(WORLD, Converter.get_feature_name(('p', *o)), unique=True)
             self.assertEqual(p, v)
         conv.world.step()
         for o, v in objs.items():
-            p = conv.world.getState(WORLD, Converter.get_fluent_name(('p', *o)), unique=True)
+            p = conv.world.getState(WORLD, Converter.get_feature_name(('p', *o)), unique=True)
             self.assertEqual(p, False)
 
     def test_fluent_multi_param_init2(self):
@@ -406,11 +406,11 @@ class TestTypes(unittest.TestCase):
         conv = Converter()
         conv.convert_str(rddl)
         for o, v in objs.items():
-            p = conv.world.getState(WORLD, Converter.get_fluent_name(('p', *o)), unique=True)
+            p = conv.world.getState(WORLD, Converter.get_feature_name(('p', *o)), unique=True)
             self.assertEqual(p, v)
         conv.world.step()
         for o, v in objs.items():
-            p = conv.world.getState(WORLD, Converter.get_fluent_name(('p', *o)), unique=True)
+            p = conv.world.getState(WORLD, Converter.get_feature_name(('p', *o)), unique=True)
             self.assertEqual(p, False)
 
     def test_fluent_multi_param_dyn_self(self):
@@ -444,11 +444,11 @@ class TestTypes(unittest.TestCase):
         conv = Converter()
         conv.convert_str(rddl)
         for o, v in objs.items():
-            p = conv.world.getState(WORLD, Converter.get_fluent_name(('p', *o)), unique=True)
+            p = conv.world.getState(WORLD, Converter.get_feature_name(('p', *o)), unique=True)
             self.assertEqual(p, v)
         conv.world.step()
         for o, v in objs.items():
-            p = conv.world.getState(WORLD, Converter.get_fluent_name(('p', *o)), unique=True)
+            p = conv.world.getState(WORLD, Converter.get_feature_name(('p', *o)), unique=True)
             self.assertEqual(p, v)
 
     def test_fluent_multi_param_dyn_const(self):
@@ -490,11 +490,11 @@ class TestTypes(unittest.TestCase):
         conv = Converter()
         conv.convert_str(rddl)
         for o, v in objs.items():
-            p = conv.world.getState(WORLD, Converter.get_fluent_name(('p', *o)), unique=True)
+            p = conv.world.getState(WORLD, Converter.get_feature_name(('p', *o)), unique=True)
             self.assertEqual(p, v)
         conv.world.step()
         for o, v in objs.items():
-            p = conv.world.getState(WORLD, Converter.get_fluent_name(('p', *o)), unique=True)
+            p = conv.world.getState(WORLD, Converter.get_feature_name(('p', *o)), unique=True)
             self.assertEqual(p, v and (consts[o] >= 1))
 
     def test_non_fluent_param_def(self):
@@ -521,8 +521,8 @@ class TestTypes(unittest.TestCase):
         conv = Converter()
         conv.convert_str(rddl)
         for o, v in objs.items():
-            self.assertIn(Converter.get_fluent_name(('C', o)), conv.constants)
-            self.assertEqual(conv.constants[Converter.get_fluent_name(('C', o))], -1)
+            self.assertIn(Converter.get_feature_name(('C', o)), conv.constants)
+            self.assertEqual(conv.constants[Converter.get_feature_name(('C', o))], -1)
 
     def test_non_fluent_param_init(self):
         objs = {'x1': 1, 'x2': 2, 'x3': 3, 'x4': 4}
@@ -551,8 +551,8 @@ class TestTypes(unittest.TestCase):
         conv = Converter()
         conv.convert_str(rddl)
         for o, v in objs.items():
-            self.assertIn(Converter.get_fluent_name(('C', o)), conv.constants)
-            self.assertEqual(conv.constants[Converter.get_fluent_name(('C', o))], v)
+            self.assertIn(Converter.get_feature_name(('C', o)), conv.constants)
+            self.assertEqual(conv.constants[Converter.get_feature_name(('C', o))], v)
 
     def test_non_fluent_multi_param_init(self):
         objs = {('x1', 'x1'): 1,
@@ -586,8 +586,8 @@ class TestTypes(unittest.TestCase):
         conv = Converter()
         conv.convert_str(rddl)
         for o, v in objs.items():
-            self.assertIn(Converter.get_fluent_name(('C', *o)), conv.constants)
-            self.assertEqual(conv.constants[Converter.get_fluent_name(('C', *o))], v)
+            self.assertIn(Converter.get_feature_name(('C', *o)), conv.constants)
+            self.assertEqual(conv.constants[Converter.get_feature_name(('C', *o))], v)
 
     def test_non_fluent_multi_param_init2(self):
         objs = {('x1', 'y1'): 1,
@@ -623,8 +623,8 @@ class TestTypes(unittest.TestCase):
         conv = Converter()
         conv.convert_str(rddl)
         for o, v in objs.items():
-            self.assertIn(Converter.get_fluent_name(('C', *o)), conv.constants)
-            self.assertEqual(conv.constants[Converter.get_fluent_name(('C', *o))], v)
+            self.assertIn(Converter.get_feature_name(('C', *o)), conv.constants)
+            self.assertEqual(conv.constants[Converter.get_feature_name(('C', *o))], v)
 
     def test_partial_observability(self):
         rddl = '''

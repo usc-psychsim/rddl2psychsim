@@ -125,7 +125,7 @@ class _ExpressionConverter(_ConverterBase):
 
         if e_type == 'pvar':
             name, params = args
-            if params is not None:
+            if params is not None and param_map is not None:
                 # try to replace param placeholder with value on dict
                 params = tuple([param_map[p] for p in params if p in param_map])
             else:

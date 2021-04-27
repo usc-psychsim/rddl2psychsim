@@ -168,14 +168,18 @@ class TestConstraints(unittest.TestCase):
                 '''
         conv = Converter(const_as_assert=True)
         conv.convert_str(rddl)
-        p = conv.world.getState(WORLD, 'p', unique=True)
-        self.assertEqual(p, 0)
+        p_ = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p_, 0)
         conv.world.step()
         ag_name = next(iter(conv.world.agents.keys()))
+        q = conv.world.getState(WORLD, 'q', unique=True)
+        self.assertEqual(q, 1)
         a = conv.world.getFeature(actionKey(ag_name), unique=True)
-        self.assertEqual(a, conv.actions[ag_name]['a2'])
+        a1 = conv.actions[ag_name]['a1']
+        a2 = conv.actions[ag_name]['a2']
+        self.assertEqual(a, a1 if q > 1 else a2)
         p = conv.world.getState(WORLD, 'p', unique=True)
-        self.assertEqual(p, -2)
+        self.assertEqual(p, p_ + 2 if a == a1 else p_ - 2)
 
     def test_actions_param_legal(self):
         objs = {'x1': True, 'x2': False, 'x3': False, 'x4': True}
@@ -207,9 +211,9 @@ class TestConstraints(unittest.TestCase):
         ag_name = next(iter(conv.world.agents.keys()))
         legal_acts = conv.world.agents[ag_name].getLegalActions()
         for name, val in objs.items():
-            p = conv.world.getState(WORLD, Converter.get_fluent_name(('p', name)), unique=True)
+            p = conv.world.getState(WORLD, Converter.get_feature_name(('p', name)), unique=True)
             self.assertEqual(p, val)
-            a = conv.actions[ag_name][Converter.get_fluent_name(('a', name))]
+            a = conv.actions[ag_name][Converter.get_feature_name(('a', name))]
             if val:
                 self.assertIn(a, legal_acts)
             else:
