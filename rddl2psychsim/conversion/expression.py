@@ -2,7 +2,7 @@ import logging
 import math
 from typing import Dict, Union, List
 from pyrddl.expr import Expression
-from psychsim.pwl import CONSTANT
+from psychsim.pwl import CONSTANT, makeFuture
 from rddl2psychsim.conversion import _ConverterBase
 
 __author__ = 'Pedro Sequeira'
@@ -133,7 +133,8 @@ class _ExpressionConverter(_ConverterBase):
             name = (name,) + params
 
             if self._is_feature(name):  # feature
-                return {self._get_feature(name): 1.}
+                future = '\'' in name[0]
+                return {makeFuture(self._get_feature(name)) if future else self._get_feature(name): 1.}
 
             ag_actions = []
             for agent in self.world.agents.values():

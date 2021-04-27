@@ -38,5 +38,4 @@ class Converter(_ConstraintsConverter):
         self._convert_reward_function()
         self._convert_dynamics()
         self._convert_state_action_constraints()
-        self._parse_requirements_post()
-        self.world.setOrder([set(self.world.agents.keys())])  # TODO assumes whichever agents created act in parallel
+        self._parse_requirements()

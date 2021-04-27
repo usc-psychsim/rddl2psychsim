@@ -1,5 +1,6 @@
 import unittest
-from psychsim.pwl import WORLD, stateKey
+from collections import OrderedDict
+from psychsim.pwl import WORLD, stateKey, turnKey
 from rddl2psychsim.conversion.converter import Converter
 
 __author__ = 'Pedro Sequeira'
@@ -438,3 +439,130 @@ class TestMultiagent(unittest.TestCase):
             self.assertIn(a1, conv.world.dynamics[p])
             self.assertIn(a2, conv.world.dynamics[p])
             self.assertIn(True, conv.world.dynamics[p])
+
+    def test_all_concurrent(self):
+        agents = OrderedDict({'John': 1.22, 'Paul': 3.75, 'George': -1.14, 'Ringo': 4.73})
+        rddl = f'''
+            domain my_test {{
+                requirements {{ concurrent }};
+                types {{ agent : object; }};
+                pvariables {{ 
+                    p(agent) : {{ state-fluent, real, default = 0 }};
+                    q : {{ state-fluent, real, default = 0 }};
+                    act : {{ action-fluent, bool, default = false }}; 
+                }};
+                cpfs {{ 
+                    p'(?a) = p(?a) + 1;
+                    q' = sum_{{?a : agent}}[ p'(?a) ]; // sum future of agents' p vars
+                }};
+                reward = 0;
+            }}
+            non-fluents my_test_empty {{ 
+                domain = my_test;
+                objects {{ agent : {{ {", ".join(agents.keys())} }}; }}; 
+            }}
+            instance my_test_inst {{ 
+                domain = my_test; 
+                init-state {{ {'; '.join(f'p({a}) = {v}' for a, v in agents.items())}; }}; 
+            }}
+            '''
+        conv = Converter()
+        conv.convert_str(rddl)
+        for a, v in agents.items():
+            p = conv.world.getState(a, 'p', unique=True)
+            self.assertEqual(p, v)
+            turn = conv.world.getFeature(turnKey(a), unique=True)
+            self.assertEqual(turn, 0)  # all agents on same turn
+        conv.world.step()
+        for a, v in agents.items():
+            p = conv.world.getState(a, 'p', unique=True)
+            self.assertEqual(p, v + 1)
+        q = conv.world.getState(WORLD, 'q', unique=True)
+        self.assertEqual(q, sum(v + 1 for v in agents.values()))
+
+    def test_all_sequential(self):
+        agents = ['John', 'Paul', 'George', 'Ringo']
+        rddl = f'''
+            domain my_test {{
+                types {{ agent : object; }};
+                pvariables {{ 
+                    p(agent) : {{ state-fluent, real, default = 0 }};
+                    q : {{ state-fluent, real, default = 0 }};
+                    act(agent) : {{ action-fluent, bool, default = false }}; 
+                }};
+                cpfs {{ 
+                    p'(?a) = if( act(?a) ) then
+                                p(?a) + 1   // action-conditioned dynamics
+                            else
+                                p(?a);
+
+                    q' = sum_{{?a : agent}}[ p'(?a) ]; // sum future of agents' p vars
+                }};
+                reward = 0;
+            }}
+            non-fluents my_test_empty {{ 
+                domain = my_test;
+                objects {{ agent : {{ {", ".join(agents)} }}; }}; 
+            }}
+            instance my_test_inst {{ domain = my_test; init-state {{ q = 0; }}; }}
+            '''
+        conv = Converter()
+        conv.convert_str(rddl)
+        for i, a in enumerate(agents):
+            p = conv.world.getState(a, 'p', unique=True)
+            self.assertEqual(p, 0)
+            turn = conv.world.getFeature(turnKey(a), unique=True)
+            self.assertEqual(turn, i)
+        q_sum = 0.
+        for a in agents:
+            conv.world.step()
+            p = conv.world.getState(a, 'p', unique=True)
+            self.assertEqual(p, 1)
+            q_sum += 1
+            q = conv.world.getState(WORLD, 'q', unique=True)
+            self.assertEqual(q, q_sum)
+
+    def test_semi_concurrent(self):
+        agents = ['John', 'Paul', 'George', 'Ringo']
+        rddl = f'''
+            domain my_test {{
+                requirements {{ concurrent }};
+                types {{ agent : object; }};
+                pvariables {{ 
+                    p(agent) : {{ state-fluent, real, default = 0 }};
+                    q : {{ state-fluent, real, default = 0 }};
+                    act(agent) : {{ action-fluent, bool, default = false }}; 
+                }};
+                cpfs {{ 
+                    p'(?a) = if( act(?a) ) then
+                                p(?a) + 1   // action-conditioned dynamics
+                            else
+                                p(?a);
+
+                    q' = sum_{{?a : agent}}[ p'(?a) ]; // sum future of agents' p vars
+                }};
+                reward = 0;
+            }}
+            non-fluents my_test_empty {{ 
+                domain = my_test;
+                objects {{ agent : {{ {", ".join(agents)} }}; }}; 
+            }}
+            instance my_test_inst {{ 
+                domain = my_test; 
+                init-state {{ q = 0; }};
+                max-nondef-actions = {len(agents) - 1}; // one agent acts after the others 
+            }}
+            '''
+        conv = Converter()
+        conv.convert_str(rddl)
+        for i, a in enumerate(agents):
+            p = conv.world.getState(a, 'p', unique=True)
+            self.assertEqual(p, 0)
+            turn = conv.world.getFeature(turnKey(a), unique=True)
+            self.assertEqual(turn, 0 if i < len(agents) - 1 else 1)
+        conv.world.step()
+        q = conv.world.getState(WORLD, 'q', unique=True)
+        self.assertEqual(q, len(agents) - 1)
+        conv.world.step()
+        q = conv.world.getState(WORLD, 'q', unique=True)
+        self.assertEqual(q, len(agents))
