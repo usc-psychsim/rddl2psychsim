@@ -23,17 +23,17 @@ class _ConverterBase(object):
     model: RDDL
     world: World
 
-    _normal_bins: List[float]
-    _normal_probs: List[float]
-    _poisson_exp_rate: int
-    _poisson_bins: List[int]
-    _poisson_probs: List[float]
-
-    def __init__(self):
+    def __init__(self, normal_stds=NORMAL_STDS, normal_bins=NORMAL_BINS, poisson_exp_rate=POISSON_EXP_RATE):
         self.features = {}
         self.constants = {}
         self.actions = {}
         self._feature_param_types = {}
+
+        # set distribution discretization params
+        self._normal_bins = np.linspace(-normal_stds, normal_stds, normal_bins).tolist()  # gets sample value centers
+        self._normal_probs = stats.norm.pdf(self._normal_bins)  # gets corresponding sample probabilities
+        self._normal_probs = (self._normal_probs / self._normal_probs.sum()).tolist()  # normalize to sum 1
+        self._poisson_exp_rate = poisson_exp_rate
 
     def log_state(self, features: List[str] = None) -> None:
         """
@@ -292,39 +292,6 @@ class _ConverterBase(object):
                 val = val.replace('@', '')  # just in case it's an enum value
             self.world.setFeature(f, val)
             logging.info(f'Initialized feature "{f}" to "{val}"')
-
-    def _parse_requirements_pre(self):
-        logging.info('__________________________________________________')
-
-        # get Normal distribution discretization params
-        normal_stds_req = [] if self.model.domain.requirements is None else \
-            [req for req in self.model.domain.requirements if 'normal_stds' in req]
-        if len(normal_stds_req) > 0:
-            normal_stds = float(normal_stds_req[0].replace('normal_stds', ''))
-        else:
-            normal_stds = NORMAL_STDS
-        logging.info(f'Using {normal_stds} standard devs to define the range of Normal distributions')
-
-        normal_bins_req = [] if self.model.domain.requirements is None else \
-            [req for req in self.model.domain.requirements if 'normal_bins' in req]
-        if len(normal_bins_req) > 0:
-            normal_bins = int(normal_bins_req[0].replace('normal_bins', ''))
-        else:
-            normal_bins = NORMAL_BINS
-        logging.info(f'Using {normal_bins} discrete bins to define the values of Normal distributions')
-
-        self._normal_bins = np.linspace(-normal_stds, normal_stds, normal_bins).tolist()  # gets sample value centers
-        self._normal_probs = stats.norm.pdf(self._normal_bins)  # gets corresponding sample probabilities
-        self._normal_probs = (self._normal_probs / self._normal_probs.sum()).tolist()  # normalize to sum 1
-
-        # get Poisson distribution discretization params
-        poisson_exp_rate_req = [] if self.model.domain.requirements is None else \
-            [req for req in self.model.domain.requirements if 'poisson_exp_rate' in req]
-        if len(poisson_exp_rate_req) > 0:
-            self._poisson_exp_rate = int(poisson_exp_rate_req[0].replace('poisson_exp_rate', ''))
-        else:
-            self._poisson_exp_rate = POISSON_EXP_RATE
-        logging.info(f'Using {self._poisson_exp_rate} as the expected rate of Poisson distributions')
 
     def _parse_requirements_post(self):
         if self.model.domain.requirements is None or len(self.model.domain.requirements) == 0:

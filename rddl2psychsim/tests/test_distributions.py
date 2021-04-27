@@ -242,7 +242,6 @@ class TestTypes(unittest.TestCase):
         stds = 4
         rddl = f'''
                 domain my_test {{
-                    requirements {{ normal_bins{num_bins}, normal_stds{stds} }};
                     pvariables {{ 
                         p : {{ state-fluent,  real, default = 0 }};
                         a : {{ action-fluent, bool, default = false }}; 
@@ -255,7 +254,7 @@ class TestTypes(unittest.TestCase):
                 non-fluents my_test_empty {{ domain = my_test; }}
                 instance my_test_inst {{ domain = my_test; init-state {{ a; }}; }}
                 '''
-        conv = Converter()
+        conv = Converter(normal_bins=num_bins, normal_stds=stds)
         conv.convert_str(rddl)
         p_ = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p_, 0)

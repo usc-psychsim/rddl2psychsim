@@ -15,7 +15,6 @@ NUM_SAMPLES = 10000
 
 RDDL = f'''
 domain my_test {{
-    requirements {{ normal_bins{NUM_BINS}, normal_stds{COVERED_STDS} }};
     pvariables {{ 
         p : {{ state-fluent,  real, default = 0 }};
         a : {{ action-fluent, bool, default = false }}; 
@@ -30,7 +29,7 @@ domain my_test {{
 '''
 
 if __name__ == '__main__':
-    conv = Converter()
+    conv = Converter(normal_bins=NUM_BINS, normal_stds=COVERED_STDS)
     conv.convert_str(RDDL)
 
     samples = []

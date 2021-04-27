@@ -13,8 +13,8 @@ __email__ = 'pedrodbs@gmail.com'
 
 class _DynamicsConverter(_ExpressionConverter):
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 
     def _convert_dynamics(self):
         # create dynamics from conditional probability functions (CPFs)

@@ -24,7 +24,7 @@ def print_state():
         x_obj = x_objs[x]
         for y in range(len(y_objs)):
             y_obj = y_objs[y]
-            f_name = Converter.get_fluent_name(('alive', x_obj, y_obj))
+            f_name = Converter.get_feature_name(('alive', x_obj, y_obj))
             state[x, y] = int(conv.world.getState(WORLD, f_name, unique=True))
     agent = next(iter(conv.world.agents.keys()))
     logging.info(f'Action: {conv.world.getFeature(actionKey(agent), unique=True)}')

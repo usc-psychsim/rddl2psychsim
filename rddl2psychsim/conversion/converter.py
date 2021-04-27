@@ -8,8 +8,8 @@ __email__ = 'pedrodbs@gmail.com'
 
 class Converter(_ConstraintsConverter):
 
-    def __init__(self, const_as_assert=True):
-        super().__init__(const_as_assert)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 
     def convert_file(self, rddl_file: str, verbose=True) -> None:
         # parse RDDL file, set model
@@ -31,7 +31,6 @@ class Converter(_ConstraintsConverter):
                      f'using instance "{self.model.instance.name}" to PsychSim...')
 
         self._create_world_agents()
-        self._parse_requirements_pre()
         self._convert_constants()
         self._convert_variables()
         self._convert_actions()

@@ -13,8 +13,8 @@ _ASSERTION_KEY = '__ASSERT__'
 
 class _ConstraintsConverter(_DynamicsConverter):
 
-    def __init__(self, const_as_assert=True):
-        super().__init__()
+    def __init__(self, const_as_assert=True, **kwargs):
+        super().__init__(**kwargs)
         self._const_as_assert = const_as_assert
         self._constraint_trees: Dict[KeyedTree, Expression] = {}
 

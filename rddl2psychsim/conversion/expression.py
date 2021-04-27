@@ -83,8 +83,8 @@ def _get_const_val(expr: Dict) -> Union[float, None]:
 
 class _ExpressionConverter(_ConverterBase):
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 
     def _is_enum_expr(self, expr: Dict) -> bool:
         """
