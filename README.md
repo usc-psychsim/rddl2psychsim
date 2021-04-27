@@ -183,7 +183,7 @@ x' = if (go_right) then
 
 ## Multiagent Domains
 
-Multiagent scenarios can be created by defining a special type of object in the RDDL `type` section with the name `agent`. PsychSim agents are then created for each object type defined in the `instance` section. For example, 
+Multiagent scenarios can be created by defining a special type of object in the RDDL `types` section with the name `agent`. PsychSim agents are then created for each object type defined in the `non-fluents` section. For example, 
 
 ```yacas
 domain my_domain {
