@@ -301,7 +301,7 @@ class _ConverterBase(object):
         agents = self.world.agents
         requirements = self.model.domain.requirements
 
-        # check multiagent concurrency, agent order is assumed by RDDL instance definition order
+        # check concurrent multiagent actions, agent order is assumed by RDDL instance definition
         if len(agents) > 1 and requirements is not None and 'concurrent' in requirements:
             if hasattr(self.model.instance, 'max_nondef_actions'):
                 # creates groups of agents that act in parallel according to "max_nondef_actions" param

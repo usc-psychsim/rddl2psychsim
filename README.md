@@ -126,13 +126,14 @@ Creates a deterministic/stochastic effect for the following distributions:
     could be transformed into:
 
     ```yacas
-    if (q >= 2) then
-      Discrete(enum_level, @low : 0.5, @medium : 0.2, @high : 0.3)
-    else
-      Discrete(enum_level, @low : 0.2, @medium : 0.5, @high : 0.3);
+    if (q >= 2) then 
+    	Discrete(enum_level, @low : 0.5, @medium : 0.2, @high : 0.3)
+    else 
+    	Discrete(enum_level, @low : 0.2, @medium : 0.5, @high : 0.3);
     ```
+    
 
-    to achieve the same effect
+to achieve the same effect
 
 - `Normal(m,s)`: samples a continuous value from a *discrete approximation* of a Normal distribution $\mathcal{N}(\mu,\sigma^{2})$ with mean $\mu=$`m` and standard deviation $\sigma=$`s`. 
 
@@ -140,14 +141,14 @@ Creates a deterministic/stochastic effect for the following distributions:
 
   - supports arbitrary arithmetic expressions for `m` and `s`, as long as they define linear functions
   - in RDDL's definition, `s` defines the variance, not the standard deviation. But, to allow for using numerical expressions, it needs to be the standard deviation
-  - the number of bins/values for the discrete approximation for Normal distributions in a domain can be set in the `requirements` section via `normal_bins{INT_VAL}`. Another parameter $\tau$, defined via  `normal_stds{FLOAT_VAL}`, stipulates the finite range of values sampled from the distribution, namely $[\mu-(\tau\sigma),\mu+(\tau\sigma)]$. See example at: `examples/normal_distribution.py`
+  - the number of bins/values for the discrete approximation for Normal distributions in a domain can be set via `Converter` constructor parameter `normal_bin`. Another parameter $\tau$, defined via  `normal_stds`, stipulates the finite range of values sampled from the distribution, namely $[\mu-(\tau\sigma),\mu+(\tau\sigma)]$. See example at: `examples/normal_distribution.py`
 
 - `Poisson(l)`: samples a value from a *discrete approximation* of a Poisson distribution with rate parameter $\lambda=$`l` per fixed time interval. 
 
   <u>Notes:</u>
 
   - supports arbitrary arithmetic expressions for `l`, as long as they define linear functions
-  - the distribution is approximated via a Normal distribution $\mathcal{N}(\lambda,\sqrt{\hat{\lambda}})$, where $\hat{\lambda}$ is the expected rate of Poisson distributions for this domain. This parameter can be defined via  `poisson_exp_rate{INT_VAL}` in the `requirements` section
+  - the distribution is approximated via a Normal distribution $\mathcal{N}(\lambda,\sqrt{\hat{\lambda}})$, where $\hat{\lambda}$ is the expected rate of Poisson distributions for this domain. This parameter can be defined via the  `poisson_exp_rate` constructor of the ` Converter` constructor
   - due to this approximation, sampling from the distribution might return a value in $\mathbb{R}$ rather than $\mathbb{N}$, so further adjustments might be required
 
 ## State and Action Constraints
@@ -172,13 +173,70 @@ Usually, dynamics to update a fluent defined inside the `cpfs` section of a RDDL
 This is achieved by having `if` statements in the dynamics expressions of fluents where the action is the only element in the condition expression, i.e., expressions in the form: `if (act) then act_dyn_expr else world_dyn_exp`. This means that `act_dyn_expr` is only going to be evaluated when action `act` is executed, otherwise `world_dyn_exp` will be used to update the feature's value. We can define multiple action-dependent dynamics for the same feature by using nested if's, e.g.:
 
 ```yacas
-x' = if (go_right) then
-		x + 1
-	else if (go_left) then
-		x - 1
-	else
-		x;
+x' = if (go_right) then 
+        x + 1
+    else if (go_left) then 
+        x - 1
+    else 
+        x;
 ```
+
+## Multiagent Domains
+
+Multiagent scenarios can be created by defining a special type of object in the RDDL `type` section with the name `agent`. PsychSim agents are then created for each object type defined in the `instance` section. For example, 
+
+```yacas
+domain my_domain {
+    types { agent : object; ...};
+    ...
+}
+...
+non-fluents my_nf { 
+    domain = my_domain;
+    objects { agent: Agent1, Agent2; }; 
+}
+```
+
+will create a world populated by two agents named `Agent1` and `Agent2`. 
+
+If the `agent` object type is not specified, then a single PsychSim agent will be created by default. All actions defined will be associated with that agent and all features (fluents) will be associated with the world.
+
+### Agent State
+
+By defining fluents parameterized on the `agent` object type in a multiagent domain we can create PsychSim agents with state. For example, we could create a fluent ` pos(agent) : { state-fluent, int, default = 0 };` in the `pvariables` section of the domain and then initialize each agent's position to a different value in the `instance` definition. 
+
+### Agent Actions
+
+Similarly, we can parameterize each action with an agent, e.g., ` act(agent) : { action-fluent, bool};`.
+
+<u>Note:</u> in terms of the underlying PsychSim conversion, this is equivalent to *not* specifying the `agent` type parameter, i.e., all actions will be created for all the agents. However, the advantage of the action parameterization is that we can specify in the RDDL definition both *action constraints* (legality), via
+
+```yacas
+forall_{?a : agent}}[ act(?a) => ... ];
+```
+
+and *action-conditioned dynamics*, via
+
+````yacas
+x'(?a) = if ( action1(?a) ) then ... else if ( action2(?a) ) then ... else ...;
+````
+
+We can also parameterize fluents and actions with other object types. The order in which the `agent` parameter appears is not relevant, i.e., `pos(agent, x_coord, y_coord)` is equivalent to `pos(x_coord, agent, y_coord)`.
+
+<u>Note:</u> however the order of the other parameters *does* matter.
+
+### Concurrency
+
+RDDL concurrency is translated into PsychSim in terms of "agent turns", i.e., who acts in parallel and what is the order among agents at each decision step. By default, a world is created with a *sequential* turn order among the agents, where the agents' turn order is defined according to the order in which the `agent` object types are specified in the `objects` section of the `instance`. In the example above, `Agent1` would act first, then `Agent2`, then `Agent1` again and so on.
+
+However, if `concurrent` is defined in the domain's `requirements` section, then the agents can act in parallel (concurrently). If nothing else is specified, then *all* agents have the same turn order. If `max-nondef-actions=<INT>` is specified in the `instance` definition, then that number of agents will act in parallel (same turn), and again the order will be as specified by the `agent` object's definition. For example, 
+
+```yacas
+non-fluents my_nf { objects { agent: Agent1, Agent2, Agent3; }; ... } 
+instance my_inst { max-nondef-actions = 2; ... }
+```
+
+would result in `Agent1` and `Agent2` acting in parallel in the first turn, then `Agent3` acting in the second turn, and so on.
 
 # References
 

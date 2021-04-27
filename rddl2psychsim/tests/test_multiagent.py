@@ -522,7 +522,7 @@ class TestMultiagent(unittest.TestCase):
             q = conv.world.getState(WORLD, 'q', unique=True)
             self.assertEqual(q, q_sum)
 
-    def test_semi_concurrent(self):
+    def test_partial_concurrent(self):
         agents = ['John', 'Paul', 'George', 'Ringo']
         rddl = f'''
             domain my_test {{
