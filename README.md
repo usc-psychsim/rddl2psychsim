@@ -227,7 +227,7 @@ We can also parameterize fluents and actions with other object types. The order 
 
 ### Concurrency
 
-RDDL concurrency is translated into PsychSim in terms of "agent turns", i.e., who acts in parallel and what is the order among agents at each decision step. By default, a world is created with a *sequential* turn order among the agents, where the agents' turn order is defined according to the order in which the `agent` object types are specified in the `objects` section of the `instance`. In the example above, `Agent1` would act first, then `Agent2`, then `Agent1` again and so on.
+RDDL concurrency is translated into PsychSim in terms of "agent turns", i.e., who acts in parallel and what is the order among agents at each decision step. By default, a world is created with a *sequential* turn order among the agents, where the agents' turn order is defined according to the order in which the `agent` object types are specified in the `objects` section of the `non-fluents` instance. In the example above, `Agent1` would act first, then `Agent2`, then `Agent1` again and so on.
 
 However, if `concurrent` is defined in the domain's `requirements` section, then the agents can act in parallel (concurrently). If nothing else is specified, then *all* agents have the same turn order. If `max-nondef-actions=<INT>` is specified in the `instance` definition, then that number of agents will act in parallel (same turn), and again the order will be as specified by the `agent` object's definition. For example, 
 
