@@ -3,7 +3,7 @@ import logging
 import numpy as np
 import scipy.stats as stats
 from collections import OrderedDict
-from typing import List, Tuple
+from typing import List, Tuple, Set
 from pyrddl.pvariable import PVariable
 from pyrddl.rddl import RDDL
 from psychsim.action import ActionSet
@@ -23,6 +23,8 @@ POISSON_EXP_RATE = 10
 class _ConverterBase(object):
     model: RDDL
     world: World
+
+    turn_order: List[Set[str]]
 
     def __init__(self, normal_stds=NORMAL_STDS, normal_bins=NORMAL_BINS, poisson_exp_rate=POISSON_EXP_RATE):
         self.features = {}
@@ -307,14 +309,14 @@ class _ConverterBase(object):
                 # creates groups of agents that act in parallel according to "max_nondef_actions" param
                 num_parallel = self.model.instance.max_nondef_actions
                 ag_list = list(self.actions.keys())
-                groups = []
+                self.turn_order = []
                 for i in range(0, len(agents), num_parallel):
-                    groups.append(set(ag_list[i:min(i + num_parallel, len(agents))]))
+                    self.turn_order.append(set(ag_list[i:min(i + num_parallel, len(agents))]))
             else:
-                groups = [set(agents.keys())]  # assumes all agents act in parallel
-            self.world.setOrder(groups)
+                self.turn_order = [set(agents.keys())]  # assumes all agents act in parallel
         else:
-            self.world.setOrder([{ag} for ag in agents.keys()])  # assumes all agents act sequentially
+            self.turn_order = [{ag} for ag in agents.keys()]  # assumes all agents act sequentially
+        self.world.setOrder(self.turn_order)
 
         # sets omega to observe only observ-fluents (ignore interm and state-fluents)
         # TODO assume homogeneous agents (partial observability affects all agents the same)
