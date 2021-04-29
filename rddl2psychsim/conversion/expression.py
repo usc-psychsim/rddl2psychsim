@@ -4,6 +4,7 @@ from typing import Dict, Union, List
 from pyrddl.expr import Expression
 from psychsim.pwl import CONSTANT, makeFuture
 from rddl2psychsim.conversion import _ConverterBase
+from rddl2psychsim.rddl import expression_to_rddl
 
 __author__ = 'Pedro Sequeira'
 __email__ = 'pedrodbs@gmail.com'
@@ -110,18 +111,14 @@ class _ExpressionConverter(_ConverterBase):
         e_type = expression.etype[0]
         args = expression.args
         if e_type == 'constant':
-            try:
-                return {CONSTANT: args}
-            except ValueError as e:
-                logging.info(f'Could not convert value "{args}" to float in RDDL expression "{expression}"!')
-                raise e
+            return {CONSTANT: args}
 
         if e_type == 'penum':
             # just check if enumerated type is known
             val = args.replace('@', '')
             if self._is_enum_type(val):
                 return {CONSTANT: val}
-            raise ValueError(f'Could not find enumerated type from RDDL expression "{expression}"!')
+            raise ValueError(f'Could not find enumerated type from RDDL expression "{expression_to_rddl(expression)}"!')
 
         if e_type == 'pvar':
             name, params = args
@@ -154,10 +151,12 @@ class _ExpressionConverter(_ConverterBase):
                     value = self._get_constant_value(name)
                     return {CONSTANT: float(value)}
                 except ValueError as e:
-                    logging.info(f'Could not convert value "{value}" to float in RDDL expression "{expression}"!')
+                    logging.info(f'Could not convert value "{name}" to float in RDDL expression '
+                                 f'"{expression_to_rddl(expression)}"!')
                     raise e
 
-            raise ValueError(f'Could not find feature, action or constant from RDDL expression "{expression}"!')
+            raise ValueError(f'Could not find feature, action or constant from RDDL expression '
+                             f'"{expression_to_rddl(expression)}"!')
 
         if e_type == 'arithmetic':
             return self._convert_arithmetic_expr(expression, param_map)
@@ -178,7 +177,8 @@ class _ExpressionConverter(_ConverterBase):
             return self._convert_aggregation_expr(expression, param_map)
 
         # not yet implemented
-        raise NotImplementedError(f'Cannot parse expression: "{expression}" of type "{e_type}"!')
+        raise NotImplementedError(f'Cannot parse expression: "{expression_to_rddl(expression)}", '
+                                  f'cannot handle type "{e_type}"!')
 
     def _convert_arithmetic_expr(self, expression: Expression, param_map: Dict[str, str] = None) -> Dict:
 
@@ -212,7 +212,7 @@ class _ExpressionConverter(_ConverterBase):
                 return _scale_linear_function(rhs, lhs_const)  # multiply right-hand side by const
             if isinstance(rhs_const, float) and _is_linear_function(lhs):
                 return _scale_linear_function(lhs, rhs_const)  # multiply left-hand side by const
-            raise ValueError(f'Non-PWL operation is not supported: "{expression}"!')
+            raise ValueError(f'Non-PWL operation is not supported: "{expression_to_rddl(expression)}"!')
 
         elif a_type == '/':
             # if division, only works if right or both sides are constants
@@ -220,9 +220,10 @@ class _ExpressionConverter(_ConverterBase):
                 return {CONSTANT: lhs_const / rhs_const}  # reduce
             if isinstance(rhs_const, float) and _is_linear_function(lhs):
                 return _scale_linear_function(lhs, 1. / rhs_const)  # divide left-hand side by const
-            raise ValueError(f'Non-PWL operation is not supported: "{expression}"!')
+            raise ValueError(f'Non-PWL operation is not supported: "{expression_to_rddl(expression)}"!')
 
-        raise NotImplementedError(f'Cannot parse arithmetic expression: "{expression}" of type "{a_type}"!')
+        raise NotImplementedError(f'Cannot parse arithmetic expression: "{expression_to_rddl(expression)}",'
+                                  f'cannot handle type "{a_type}"!')
 
     def _convert_boolean_expr(self, expression: Expression, param_map: Dict[str, str] = None) -> Dict:
 
@@ -313,7 +314,8 @@ class _ExpressionConverter(_ConverterBase):
                 return {'not': lhs}  # right is false, negate left
             return {'imply': (lhs, rhs)}  # defer for later processing
 
-        raise NotImplementedError(f'Cannot parse boolean expression: "{expression}" of type "{b_type}"!')
+        raise NotImplementedError(f'Cannot parse boolean expression: "{expression_to_rddl(expression)}",'
+                                  f'cannot handle type "{b_type}"!')
 
     def _convert_relational_expr(self, expression: Expression, param_map: Dict[str, str] = None) -> Dict:
 
@@ -334,7 +336,8 @@ class _ExpressionConverter(_ConverterBase):
             # left and right have to be linear funcs
             assert (_is_linear_function(lhs) or self._is_enum_expr(lhs)) and \
                    (_is_linear_function(rhs) or self._is_enum_expr(rhs)), \
-                f'Could not parse relational expression "{expression}", invalid PWL equivalence composition!'
+                f'Could not parse relational expression "{expression_to_rddl(expression)}", ' \
+                f'invalid PWL equivalence composition!'
             return {'eq': (lhs, rhs)}  # defer for later processing
 
         if b_type == '~=':
@@ -347,7 +350,8 @@ class _ExpressionConverter(_ConverterBase):
             # left and right have to be linear funcs
             assert (_is_linear_function(lhs) or self._is_enum_expr(lhs)) and \
                    (_is_linear_function(rhs) or self._is_enum_expr(rhs)), \
-                f'Could not parse relational expression "{expression}", invalid PWL equivalence composition!'
+                f'Could not parse relational expression "{expression_to_rddl(expression)}", ' \
+                f'invalid PWL equivalence composition!'
             return {'neq': (lhs, rhs)}  # defer for later processing
 
         if b_type == '>':
@@ -360,7 +364,8 @@ class _ExpressionConverter(_ConverterBase):
             # left and right have to be linear funcs
             assert (_is_linear_function(lhs) or self._is_enum_expr(lhs)) and \
                    (_is_linear_function(rhs) or self._is_enum_expr(rhs)), \
-                f'Could not parse relational expression "{expression}", invalid PWL equivalence composition!'
+                f'Could not parse relational expression "{expression_to_rddl(expression)}", ' \
+                f'invalid PWL equivalence composition!'
             return {'gt': (lhs, rhs)}  # defer for later processing
 
         if b_type == '<':
@@ -373,7 +378,8 @@ class _ExpressionConverter(_ConverterBase):
             # left and right have to be linear funcs
             assert (_is_linear_function(lhs) or self._is_enum_expr(lhs)) and \
                    (_is_linear_function(rhs) or self._is_enum_expr(rhs)), \
-                f'Could not parse relational expression "{expression}", invalid PWL equivalence composition!'
+                f'Could not parse relational expression "{expression_to_rddl(expression)}", ' \
+                f'invalid PWL equivalence composition!'
             return {'lt': (lhs, rhs)}  # defer for later processing
 
         if b_type == '>=':
@@ -386,7 +392,8 @@ class _ExpressionConverter(_ConverterBase):
             # left and right have to be linear funcs
             assert (_is_linear_function(lhs) or self._is_enum_expr(lhs)) and \
                    (_is_linear_function(rhs) or self._is_enum_expr(rhs)), \
-                f'Could not parse relational expression "{expression}", invalid PWL equivalence composition!'
+                f'Could not parse relational expression "{expression_to_rddl(expression)}", ' \
+                f'invalid PWL equivalence composition!'
             return {'geq': (lhs, rhs)}  # defer for later processing
 
         if b_type == '<=':
@@ -399,10 +406,12 @@ class _ExpressionConverter(_ConverterBase):
             # left and right have to be linear funcs
             assert (_is_linear_function(lhs) or self._is_enum_expr(lhs)) and \
                    (_is_linear_function(rhs) or self._is_enum_expr(rhs)), \
-                f'Could not parse relational expression "{expression}", invalid PWL equivalence composition!'
+                f'Could not parse relational expression "{expression_to_rddl(expression)}",' \
+                f'invalid PWL equivalence composition!'
             return {'leq': (lhs, rhs)}  # defer for later processing
 
-        raise NotImplementedError(f'Cannot parse relational expression: "{expression}" of type "{b_type}"!')
+        raise NotImplementedError(f'Cannot parse relational expression: "{expression_to_rddl(expression)}",'
+                                  f'cannot handle type "{b_type}"!')
 
     def _convert_control_expr(self, expression: Expression, param_map: Dict[str, str] = None) -> Dict:
         c_type = expression.etype[1]
@@ -414,12 +423,14 @@ class _ExpressionConverter(_ConverterBase):
             return {'if': cond, True: true_branch, False: false_branch}
 
         if c_type == 'switch':
-            assert len(expression.args) > 1, f'Cannot parse switch expression: "{expression}", no cases provided!'
+            assert len(expression.args) > 1, f'Cannot parse switch expression: "{expression_to_rddl(expression)}", ' \
+                                             f'no cases provided!'
 
             # get expression for terminal condition, has to be PWL
             cond = self._convert_expression(expression.args[0], param_map)
             assert _is_linear_function(
-                cond), f'Cannot parse switch expression: "{expression}", switch condition is not PWL!'
+                cond), f'Cannot parse switch expression: "{expression_to_rddl(expression)}", ' \
+                       f'switch condition is not PWL!'
 
             # get expressions for each of the branches
             case_values = []
@@ -430,30 +441,34 @@ class _ExpressionConverter(_ConverterBase):
                     val = self._convert_expression(arg[1][0], param_map)
                     branch = self._convert_expression(arg[1][1], param_map)
                 elif case_type == 'default':
-                    assert 'default' not in case_values, f'Cannot parse switch expression: "{expression}", ' \
-                                                         f'default branch defined more than once!'
+                    assert 'default' not in case_values, \
+                        f'Cannot parse switch expression: "{expression_to_rddl(expression)}", ' \
+                        f'default branch defined more than once!'
                     val = 'default'
                     branch = self._convert_expression(arg[1], param_map)
                 else:
-                    raise ValueError(f'Cannot parse switch expression: "{expression}", '
+                    raise ValueError(f'Cannot parse switch expression: "{expression_to_rddl(expression)}", '
                                      f'unknown case type: "{case_type}"!')
 
                 assert val == 'default' or _is_linear_function(val) or self._is_enum_expr(val), \
-                    f'Cannot parse switch expression: "{expression}", case condition is not PWL!'
+                    f'Cannot parse switch expression: "{expression_to_rddl(expression)}", case condition is not PWL!'
                 case_values.append(val)
                 case_branches.append(branch)
 
-            assert 'default' in case_values, f'Cannot parse switch expression: "{expression}", missing default branch!'
+            assert 'default' in case_values, \
+                f'Cannot parse switch expression: "{expression_to_rddl(expression)}", missing default branch!'
             return {'switch': (cond, case_values, case_branches)}
 
-        raise NotImplementedError(f'Cannot parse control expression: "{expression}" of type "{c_type}"!')
+        raise NotImplementedError(f'Cannot parse control expression: "{expression_to_rddl(expression)}",'
+                                  f'cannot handle type "{c_type}"!')
 
     def _convert_distribution_expr(self, expression: Expression, param_map: Dict[str, str] = None) -> Dict:
         d_type = expression.etype[1]
         if d_type == 'Bernoulli':
             arg = self._convert_expression(expression.args[0], param_map)
             assert _get_const_val(arg) is not None, \
-                f'Cannot parse stochastic expression: "{expression}", non-constant probability: "{arg}"!'
+                f'Cannot parse stochastic expression: "{expression_to_rddl(expression)}", ' \
+                f'non-constant probability: "{arg}"!'
             p = arg[CONSTANT]
             return {'distribution': [({CONSTANT: 1}, p), ({CONSTANT: 0}, 1 - p)]}
 
@@ -472,12 +487,14 @@ class _ExpressionConverter(_ConverterBase):
                 if isinstance(val_type, tuple) and val_type[0] == 'enum_type' and self._is_enum(val_type[1]):
                     if self._is_enum_type(val):
                         return val.replace('@', '')
-                    raise ValueError(f'Cannot parse stochastic expression: "{expression}", '
+                    raise ValueError(f'Cannot parse stochastic expression: "{expression_to_rddl(expression)}", '
                                      f'unknown enum value "{val}" for type "{val_type}"')
-                raise ValueError(f'Cannot parse stochastic expression: "{expression}", unknown type "{val_type}"')
+                raise ValueError(f'Cannot parse stochastic expression: "{expression_to_rddl(expression)}",'
+                                 f'unknown type "{val_type}"')
 
             assert len(expression.args) > 1, \
-                f'Cannot parse stochastic expression: "{expression}", must provide at least one value!'
+                f'Cannot parse stochastic expression: "{expression_to_rddl(expression)}", ' \
+                f'must provide at least one value!'
 
             # return a key-value pair for the discrete distribution; has to be constant probability value
             val_type = expression.args[0]
@@ -486,12 +503,14 @@ class _ExpressionConverter(_ConverterBase):
                 k = _get_value(arg[1][0])
                 v = _get_const_val(self._convert_expression(arg[1][1], param_map))
                 assert v is not None, \
-                    f'Cannot parse stochastic expression: "{expression}", non-constant probability: "{v}"!'
+                    f'Cannot parse stochastic expression: "{expression_to_rddl(expression)}", ' \
+                    f'non-constant probability: "{v}"!'
                 if v > 0:
                     dist.append(({CONSTANT: k}, v))
 
             assert sum(v for _, v in dist) == 1, \
-                f'Cannot parse stochastic expression: "{expression}", probabilities have to sum to 1!'
+                f'Cannot parse stochastic expression: "{expression_to_rddl(expression)}", ' \
+                f'probabilities have to sum to 1!'
             return {'distribution': dist}
 
         if d_type == 'Normal':
@@ -499,7 +518,8 @@ class _ExpressionConverter(_ConverterBase):
             mu = self._convert_expression(expression.args[0], param_map)
             std = self._convert_expression(expression.args[1], param_map)  # assume this is stdev, not variance!
             assert _is_linear_function(mu) and _is_linear_function(std), \
-                f'Cannot parse stochastic expression: "{expression}", mean and std have to be linear functions!'
+                f'Cannot parse stochastic expression: "{expression_to_rddl(expression)}", ' \
+                f'mean and std have to be linear functions!'
             dist = []
             for i, b in enumerate(self._normal_bins):
                 k = _combine_linear_functions(_scale_linear_function(std, b), mu)  # sample val = mean + bin * std
@@ -516,7 +536,8 @@ class _ExpressionConverter(_ConverterBase):
             # check param, has to be linear function
             lamb = self._convert_expression(expression.args[0], param_map)
             assert _is_linear_function(lamb), \
-                f'Cannot parse stochastic expression: "{expression}", lambda has to be linear function!'
+                f'Cannot parse stochastic expression: "{expression_to_rddl(expression)}", ' \
+                f'lambda has to be linear function!'
             dist = []
             std = math.sqrt(self._poisson_exp_rate)  # lambda expected to be around expected rate
             for i, b in enumerate(self._normal_bins):
@@ -530,7 +551,8 @@ class _ExpressionConverter(_ConverterBase):
 
             return {'distribution': dist}
 
-        raise NotImplementedError(f'Cannot parse stochastic expression: "{expression}" of type "{d_type}"!')
+        raise NotImplementedError(f'Cannot parse stochastic expression: "{expression_to_rddl(expression)}",'
+                                  f'cannot handle type "{d_type}"!')
 
     def _convert_aggregation_expr(self, expression: Expression, param_map: Dict[str, str] = None) -> Dict:
         d_type = expression.etype[1]
@@ -539,7 +561,7 @@ class _ExpressionConverter(_ConverterBase):
 
         if d_type == 'sum':
             assert all(len(arg) == 2 and arg[0] == 'typed_var' for arg in expression.args[:-1]), \
-                f'Cannot parse aggregation expression: "{expression}", invalid summation arguments!'
+                f'Cannot parse aggregation expression: "{expression_to_rddl(expression)}", invalid summation arguments!'
 
             # combine linear functions resulting from param substitutions in sub-expressions
             param_maps = self._get_param_mappings(expression)
@@ -551,7 +573,7 @@ class _ExpressionConverter(_ConverterBase):
 
         if d_type == 'prod':
             assert all(len(arg) == 2 and arg[0] == 'typed_var' for arg in expression.args[:-1]), \
-                f'Cannot parse aggregation expression: "{expression}", invalid product arguments!'
+                f'Cannot parse aggregation expression: "{expression_to_rddl(expression)}", invalid product arguments!'
 
             # then combine linear functions resulting from param substitutions in sub-expressions
             param_maps = self._get_param_mappings(expression)
@@ -560,13 +582,15 @@ class _ExpressionConverter(_ConverterBase):
                 expr = self._convert_expression(expression.args[-1], {**param_map, **p_map})
                 const_val = _get_const_val(expr)
                 assert const_val is not None, \
-                    f'Cannot parse aggregation: "{expression}", non-constant expression: "{expr}"!'
+                    f'Cannot parse aggregation expression: "{expression_to_rddl(expression)}", ' \
+                    f'non-constant expression: "{expr}"!'
                 lf = _scale_linear_function(lf, const_val)  # product of constant values
             return {CONSTANT: 0} if len(lf) == 0 else lf
 
         if d_type == 'forall':
             assert all(len(arg) == 2 and arg[0] == 'typed_var' for arg in expression.args[:-1]), \
-                f'Cannot parse aggregation expression: "{expression}", invalid conjunction arguments!'
+                f'Cannot parse aggregation expression: "{expression_to_rddl(expression)}", ' \
+                f'invalid conjunction arguments!'
 
             # combine param substitutions in sub-expressions
             param_maps = self._get_param_mappings(expression)
@@ -589,7 +613,8 @@ class _ExpressionConverter(_ConverterBase):
 
         if d_type == 'exists':
             assert all(len(arg) == 2 and arg[0] == 'typed_var' for arg in expression.args[:-1]), \
-                f'Cannot parse aggregation expression: "{expression}", invalid disjunction arguments!'
+                f'Cannot parse aggregation expression: "{expression_to_rddl(expression)}", ' \
+                f'invalid disjunction arguments!'
 
             # combine param substitutions in sub-expressions
             param_maps = self._get_param_mappings(expression)
@@ -610,4 +635,5 @@ class _ExpressionConverter(_ConverterBase):
                 lf = {'logic_or': (lf, expr)}  # AND tree
             return lf
 
-        raise NotImplementedError(f'Cannot parse aggregation expression: "{expression}" of type "{d_type}"!')
+        raise NotImplementedError(f'Cannot parse aggregation expression: "{expression_to_rddl(expression)}",'
+                                  f'cannot handle type "{d_type}"!')
