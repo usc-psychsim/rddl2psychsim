@@ -77,7 +77,9 @@ def _get_const_val(expr: Dict) -> Union[float, None]:
     """
     try:
         return None if not isinstance(expr, dict) else \
-            float(expr[CONSTANT]) if len(expr) == 1 and CONSTANT in expr else None
+            float(expr[CONSTANT]) if len(expr) == 1 and CONSTANT in expr else \
+                0. if len(expr) == 1 and next(iter(expr.values())) == 0 else \
+                    None
     except ValueError:
         return None
 
@@ -130,14 +132,14 @@ class _ExpressionConverter(_ConverterBase):
             name = (name,) + params
 
             if self._is_feature(name):  # feature
-                future = '\'' in name[0]
+                future = '\'' in name[0]  # check if we should get future (current) or old value
                 return {makeFuture(self._get_feature(name)) if future else self._get_feature(name): 1.}
 
             ag_actions = []
             for agent in self.world.agents.values():
                 if self._is_action(name, agent):
-                    future = '\'' in name[0]
-                    ag_actions.append((agent, self._get_action(name, agent), future))  # identify this as agent's action
+                    # identify this as agent's *future / current* action
+                    ag_actions.append((agent, self._get_action(name, agent), True))
             if len(ag_actions) > 0:
                 # TODO can do plane disjunction when supported in PsychSim
                 # creates OR nested tree for matching any agents' actions
@@ -420,6 +422,9 @@ class _ExpressionConverter(_ConverterBase):
             cond = self._convert_expression(expression.args[0], param_map)
             true_branch = self._convert_expression(expression.args[1], param_map)
             false_branch = self._convert_expression(expression.args[2], param_map)
+            cond_const = _get_const_val(cond)
+            if isinstance(cond_const, float):  # if constant condition, then simply choose branch
+                return true_branch if bool(cond_const) else false_branch
             return {'if': cond, True: true_branch, False: false_branch}
 
         if c_type == 'switch':
@@ -428,9 +433,8 @@ class _ExpressionConverter(_ConverterBase):
 
             # get expression for terminal condition, has to be PWL
             cond = self._convert_expression(expression.args[0], param_map)
-            assert _is_linear_function(
-                cond), f'Cannot parse switch expression: "{expression_to_rddl(expression)}", ' \
-                       f'switch condition is not PWL!'
+            assert _is_linear_function(cond), \
+                f'Cannot parse switch expression: "{expression_to_rddl(expression)}", switch condition is not PWL!'
 
             # get expressions for each of the branches
             case_values = []
@@ -598,12 +602,28 @@ class _ExpressionConverter(_ConverterBase):
             for p_map in param_maps:
                 sub_exprs.append(self._convert_expression(expression.args[-1], {**param_map, **p_map}))
 
+            # filter sub-expressions
+            filtered_sub_exprs = []
+            for i, expr in enumerate(sub_exprs):
+                const_val = _get_const_val(expr)
+                if const_val is None:
+                    filtered_sub_exprs.append(expr)
+                elif not bool(const_val):  # check False constant, then forall is False
+                    return {CONSTANT: False}
+                # otherwise got True constant, then does not affect forall
+
+            sub_exprs = filtered_sub_exprs
+            if len(sub_exprs) == 0:  # if nothing to check, forall is True
+                return {CONSTANT: True}
+            if len(sub_exprs) == 1:  # if only one expression in forall, then just return it
+                return sub_exprs[0]
+
             # if all linear ops, just add everything (thresh >= len)
             if all(_is_linear_function(expr) for expr in sub_exprs):
                 lf = {}
                 for expr in sub_exprs:
                     lf = _combine_linear_functions(lf, expr)  # sum linear functions
-                return {CONSTANT: False} if len(lf) == 0 else {'linear_and': lf}
+                return {CONSTANT: False} if len(lf) == 0 else lf if len(lf) == 1 else {'linear_and': lf}
 
             # otherwise build nested AND tree # TODO can do plane conjunction when supported in PsychSim
             lf = sub_exprs[0]
@@ -622,12 +642,28 @@ class _ExpressionConverter(_ConverterBase):
             for p_map in param_maps:
                 sub_exprs.append(self._convert_expression(expression.args[-1], {**param_map, **p_map}))
 
+            # filter sub-expressions
+            filtered_sub_exprs = []
+            for i, expr in enumerate(sub_exprs):
+                const_val = _get_const_val(expr)
+                if const_val is None:
+                    filtered_sub_exprs.append(expr)
+                elif bool(const_val):  # check True constant, then exists is True
+                    return {CONSTANT: True}
+                # otherwise got False constant, then does not affect exists
+
+            sub_exprs = filtered_sub_exprs
+            if len(sub_exprs) == 0:  # if nothing to check, exists is False
+                return {CONSTANT: False}
+            if len(sub_exprs) == 1:  # if only one expression in exists, then just return it
+                return sub_exprs[0]
+
             # if all linear ops, just add everything (linear OR)
             if all(_is_linear_function(expr) for expr in sub_exprs):
                 lf = {}
                 for expr in sub_exprs:
                     lf = _combine_linear_functions(lf, expr)  # sum linear functions
-                return {CONSTANT: False} if len(lf) == 0 else {'linear_or': lf}
+                return {CONSTANT: False} if len(lf) == 0 else lf if len(lf) == 1 else {'linear_or': lf}
 
             # otherwise build nested OR tree # TODO can do plane disjunction when supported in PsychSim
             lf = sub_exprs[0]

@@ -60,7 +60,7 @@ class _DynamicsConverter(_ExpressionConverter):
         for action, dyn_expr in action_dynamics.items():
             tree = makeTree(self._get_dynamics_tree(key, dyn_expr))
             self.world.setDynamics(key, action, tree)
-            logging.info(f'Set dynamics for feature "{key}" resulting from "{action}" to:\n{tree}')
+            logging.info(f'Set dynamics for feature "{key}" associated with "{action}" to:\n{tree}')
 
     def _extract_action_dynamics(self, expression: Dict) -> Dict[ActionSet or bool, Dict]:
         # check if we can pull actions from the sub-expressions
