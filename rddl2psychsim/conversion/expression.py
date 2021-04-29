@@ -67,19 +67,23 @@ def _scale_linear_function(expr, factor):
     return {k: v * factor for k, v in expr.items()}  # just scale the weight by the constant factor
 
 
-def _get_const_val(expr: Dict) -> Union[float, None]:
+def _get_const_val(expr: Dict, c_type: type = None) -> Union[float, None]:
     """
     Tests whether the given expression corresponds to a constant function and return it's value.
     :param Dict expr: the dictionary representing the (accumulated) expression.
     :param expr: the dictionary representing the (accumulated) expression.
+    :param type c_type: the type of constant we are expecting from the expression.
     :rtype: float or None
-    :return: the constant value of the expression.
+    :return: the constant value of the expression or `None` if the expression is not a constant.
     """
     try:
-        return None if not isinstance(expr, dict) else \
-            float(expr[CONSTANT]) if len(expr) == 1 and CONSTANT in expr else \
-                0. if len(expr) == 1 and next(iter(expr.values())) == 0 else \
-                    None
+        if not isinstance(expr, dict):
+            return None
+        if len(expr) == 1 and CONSTANT in expr:
+            if c_type is not None:
+                return c_type(expr[CONSTANT])
+            return expr[CONSTANT]
+        return None
     except ValueError:
         return None
 
@@ -122,6 +126,13 @@ class _ExpressionConverter(_ConverterBase):
                 return {CONSTANT: val}
             raise ValueError(f'Could not find enumerated type from RDDL expression "{expression_to_rddl(expression)}"!')
 
+        if e_type == 'param':
+            # just check if parameter is known in the current scope
+            if args in param_map:
+                return {CONSTANT: param_map[args]}
+            raise ValueError(f'Could not find parameter "{args}" in the current scope from '
+                             f'RDDL expression "{expression_to_rddl(expression)}"!')
+
         if e_type == 'pvar':
             name, params = args
             if params is not None and param_map is not None:
@@ -139,7 +150,7 @@ class _ExpressionConverter(_ConverterBase):
             for agent in self.world.agents.values():
                 if self._is_action(name, agent):
                     future = '\'' in name[0]
-                    ag_actions.append((agent, self._get_action(name, agent), future)) # identify this as agent's action
+                    ag_actions.append((agent, self._get_action(name, agent), future))  # identify this as agent's action
             if len(ag_actions) > 0:
                 # TODO can do plane disjunction when supported in PsychSim
                 # creates OR nested tree for matching any agents' actions
@@ -186,9 +197,9 @@ class _ExpressionConverter(_ConverterBase):
 
         lhs = self._convert_expression(expression.args[0], param_map)
         rhs = self._convert_expression(expression.args[1], param_map) if len(expression.args) > 1 else {}
-        lhs_const = _get_const_val(lhs)
-        rhs_const = _get_const_val(rhs) if rhs is not None else None
-        all_consts = isinstance(lhs_const, float) and isinstance(rhs_const, float)
+        lhs_const = _get_const_val(lhs, float)
+        rhs_const = _get_const_val(rhs, float) if rhs is not None else None
+        all_consts = lhs_const is not None and rhs_const is not None
         a_type = expression.etype[1]
 
         if a_type == '+':
@@ -210,9 +221,9 @@ class _ExpressionConverter(_ConverterBase):
             # if multiplication, only works if one or both sides are constants
             if all_consts:
                 return {CONSTANT: lhs_const * rhs_const}  # reduce
-            if isinstance(lhs_const, float) and _is_linear_function(rhs):
+            if lhs_const is not None and _is_linear_function(rhs):
                 return _scale_linear_function(rhs, lhs_const)  # multiply right-hand side by const
-            if isinstance(rhs_const, float) and _is_linear_function(lhs):
+            if rhs_const is not None and _is_linear_function(lhs):
                 return _scale_linear_function(lhs, rhs_const)  # multiply left-hand side by const
             raise ValueError(f'Non-PWL operation is not supported: "{expression_to_rddl(expression)}"!')
 
@@ -220,7 +231,7 @@ class _ExpressionConverter(_ConverterBase):
             # if division, only works if right or both sides are constants
             if all_consts:
                 return {CONSTANT: lhs_const / rhs_const}  # reduce
-            if isinstance(rhs_const, float) and _is_linear_function(lhs):
+            if rhs_const is not None and _is_linear_function(lhs):
                 return _scale_linear_function(lhs, 1. / rhs_const)  # divide left-hand side by const
             raise ValueError(f'Non-PWL operation is not supported: "{expression_to_rddl(expression)}"!')
 
@@ -231,19 +242,19 @@ class _ExpressionConverter(_ConverterBase):
 
         lhs = self._convert_expression(expression.args[0], param_map)
         rhs = self._convert_expression(expression.args[1], param_map) if len(expression.args) > 1 else {}
-        lhs_const = _get_const_val(lhs)
-        rhs_const = _get_const_val(rhs)
-        all_consts = isinstance(lhs_const, float) and isinstance(rhs_const, float)
+        lhs_const = _get_const_val(lhs, bool)
+        rhs_const = _get_const_val(rhs, bool)
+        all_consts = lhs_const is not None and rhs_const is not None
 
         b_type = expression.etype[1]
         if b_type == '^':
             # if AND, both sides have to be True
             if all_consts:
-                return {CONSTANT: float(bool(rhs_const) and bool(lhs_const))}
-            if isinstance(rhs_const, float):
-                return lhs if bool(rhs_const) else {CONSTANT: False}
-            if isinstance(lhs_const, float):
-                return rhs if bool(lhs_const) else {CONSTANT: False}
+                return {CONSTANT: rhs_const and lhs_const}
+            if rhs_const is not None:
+                return lhs if rhs_const else {CONSTANT: False}
+            if lhs_const is not None:
+                return rhs if lhs_const else {CONSTANT: False}
             orig_lhs = lhs
             if 'linear_and' in lhs and len(lhs) == 1:
                 lhs = lhs['linear_and']  # tries to combine several AND together
@@ -262,11 +273,11 @@ class _ExpressionConverter(_ConverterBase):
         if b_type == '|':
             # if OR, one side has to be True
             if all_consts:
-                return {CONSTANT: bool(rhs_const) or bool(lhs_const)}
-            if isinstance(rhs_const, float):
-                return {CONSTANT: True} if bool(rhs_const) else lhs
-            if isinstance(lhs_const, float):
-                return {CONSTANT: True} if bool(lhs_const) else rhs
+                return {CONSTANT: rhs_const or lhs_const}
+            if rhs_const is not None:
+                return {CONSTANT: True} if rhs_const else lhs
+            if lhs_const is not None:
+                return {CONSTANT: True} if lhs_const else rhs
             orig_lhs = lhs
             if 'linear_or' in lhs and len(lhs) == 1:
                 lhs = lhs['linear_or']  # tries to combine several OR together
@@ -284,8 +295,8 @@ class _ExpressionConverter(_ConverterBase):
 
         if b_type == '~':
             # NOT
-            if isinstance(lhs_const, float):
-                return {CONSTANT: False if bool(lhs_const) else True}  # gets constant's truth value
+            if lhs_const is not None:
+                return {CONSTANT: False if lhs_const else True}  # gets constant's truth value
             if 'not' in lhs and len(lhs) == 1:
                 return lhs['not']  # double negation
             if 'linear_and' in lhs and len(lhs) == 1:  # ~(A ^ B) <=> ~A | ~B
@@ -297,7 +308,7 @@ class _ExpressionConverter(_ConverterBase):
         if b_type == '<=>':
             # if EQUIV, sides have to be of equal boolean value
             if all_consts:
-                return {CONSTANT: bool(rhs_const) == bool(lhs_const)}  # equal booleans
+                return {CONSTANT: rhs_const == lhs_const}  # equal booleans
             if rhs == lhs:  # equal dicts
                 return {CONSTANT: True}
             return {'equiv': (lhs, rhs)}  # defer for later processing
@@ -305,13 +316,13 @@ class _ExpressionConverter(_ConverterBase):
         if b_type == '=>':
             # if IMPLICATION, false only if left is true and right is false
             if all_consts:
-                return {CONSTANT: bool(rhs_const) or not bool(lhs_const)}
-            if isinstance(lhs_const, float):
-                if not bool(lhs_const):
+                return {CONSTANT: rhs_const or not lhs_const}
+            if lhs_const is not None:
+                if not lhs_const:
                     return {CONSTANT: True}  # left is false, so implication is true
                 return rhs  # left is true, so right has to be true
-            if isinstance(rhs_const, float):
-                if bool(rhs_const):
+            if rhs_const is not None:
+                if rhs_const:
                     return {CONSTANT: True}  # right is true, so implication is true
                 return {'not': lhs}  # right is false, negate left
             return {'imply': (lhs, rhs)}  # defer for later processing
@@ -325,7 +336,7 @@ class _ExpressionConverter(_ConverterBase):
         rhs = self._convert_expression(expression.args[1], param_map) if len(expression.args) > 1 else {}
         lhs_const = _get_const_val(lhs)
         rhs_const = _get_const_val(rhs)
-        all_consts = isinstance(lhs_const, float) and isinstance(rhs_const, float)
+        all_consts = lhs_const is not None and rhs_const is not None
 
         b_type = expression.etype[1]
         if b_type == '==':
@@ -422,9 +433,9 @@ class _ExpressionConverter(_ConverterBase):
             cond = self._convert_expression(expression.args[0], param_map)
             true_branch = self._convert_expression(expression.args[1], param_map)
             false_branch = self._convert_expression(expression.args[2], param_map)
-            cond_const = _get_const_val(cond)
-            if isinstance(cond_const, float):  # if constant condition, then simply choose branch
-                return true_branch if bool(cond_const) else false_branch
+            cond_const = _get_const_val(cond, bool)
+            if cond_const is not None:  # if constant condition, then simply choose branch
+                return true_branch if cond_const else false_branch
             return {'if': cond, True: true_branch, False: false_branch}
 
         if c_type == 'switch':
@@ -505,7 +516,7 @@ class _ExpressionConverter(_ConverterBase):
             dist = []
             for arg in expression.args[1:]:
                 k = _get_value(arg[1][0])
-                v = _get_const_val(self._convert_expression(arg[1][1], param_map))
+                v = _get_const_val(self._convert_expression(arg[1][1], param_map), float)
                 assert v is not None, \
                     f'Cannot parse stochastic expression: "{expression_to_rddl(expression)}", ' \
                     f'non-constant probability: "{v}"!'
@@ -529,7 +540,7 @@ class _ExpressionConverter(_ConverterBase):
                 k = _combine_linear_functions(_scale_linear_function(std, b), mu)  # sample val = mean + bin * std
                 if len(k) == 0:
                     k = {CONSTANT: 0}  # might have been ignored
-                if _get_const_val(k) == -1:
+                if _get_const_val(k, float) == -1:
                     k = {CONSTANT: - 1 + 1e-16}  # hack, apparently hash(-1) in python evaluates to -2, so give it nudge
                 v = self._normal_probs[i]
                 dist.append((k, v))
@@ -548,7 +559,7 @@ class _ExpressionConverter(_ConverterBase):
                 k = _combine_linear_functions({CONSTANT: std * b}, lamb)  # sample val = lambda + bin * std
                 if len(k) == 0:
                     k = {CONSTANT: 0}  # might have been ignored
-                if _get_const_val(k) == -1:
+                if _get_const_val(k, float) == -1:
                     k = {CONSTANT: - 1 + 1e-16}  # hack, apparently hash(-1) in python evaluates to -2, so give it nudge
                 v = self._normal_probs[i]
                 dist.append((k, v))
@@ -584,7 +595,7 @@ class _ExpressionConverter(_ConverterBase):
             lf = {CONSTANT: 1.}
             for p_map in param_maps:
                 expr = self._convert_expression(expression.args[-1], {**param_map, **p_map})
-                const_val = _get_const_val(expr)
+                const_val = _get_const_val(expr, float)
                 assert const_val is not None, \
                     f'Cannot parse aggregation expression: "{expression_to_rddl(expression)}", ' \
                     f'non-constant expression: "{expr}"!'
@@ -605,10 +616,10 @@ class _ExpressionConverter(_ConverterBase):
             # filter sub-expressions
             filtered_sub_exprs = []
             for i, expr in enumerate(sub_exprs):
-                const_val = _get_const_val(expr)
+                const_val = _get_const_val(expr, bool)
                 if const_val is None:
                     filtered_sub_exprs.append(expr)
-                elif not bool(const_val):  # check False constant, then forall is False
+                elif not const_val:  # check False constant, then forall is False
                     return {CONSTANT: False}
                 # otherwise got True constant, then does not affect forall
 
@@ -645,10 +656,10 @@ class _ExpressionConverter(_ConverterBase):
             # filter sub-expressions
             filtered_sub_exprs = []
             for i, expr in enumerate(sub_exprs):
-                const_val = _get_const_val(expr)
+                const_val = _get_const_val(expr, bool)
                 if const_val is None:
                     filtered_sub_exprs.append(expr)
-                elif bool(const_val):  # check True constant, then exists is True
+                elif const_val:  # check True constant, then exists is True
                     return {CONSTANT: True}
                 # otherwise got False constant, then does not affect exists
 

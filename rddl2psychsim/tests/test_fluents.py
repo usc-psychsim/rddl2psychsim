@@ -451,6 +451,44 @@ class TestTypes(unittest.TestCase):
             p = conv.world.getState(WORLD, Converter.get_feature_name(('p', *o)), unique=True)
             self.assertEqual(p, v)
 
+    def test_fluent_multi_param_dyn_param(self):
+        objs = {('x1', 'x1'): True,
+                ('x1', 'x2'): False,
+                ('x2', 'x1'): False,
+                ('x2', 'x2'): True}
+        rddl = f'''
+                domain my_test {{
+                    types {{ obj : object; }};
+                    pvariables {{ 
+                        p(obj, obj) : {{ state-fluent,  bool, default = true }};
+                        a : {{ action-fluent, bool, default = false }}; 
+                    }};
+                    cpfs {{ p'(?o1, ?o2) = ?o1 ~= ?o2; }}; 
+                    reward = 0;
+                }}
+                non-fluents my_test_empty {{ 
+                    domain = my_test;
+                    objects {{
+                        obj : {{{', '.join({x for x, _ in objs.keys()})}}};
+                    }}; 
+                }}
+                instance my_test_inst {{ 
+                    domain = my_test; 
+                    init-state {{
+                        {'; '.join(f'p({",".join(o)}) = {str(v).lower()}' for o, v in objs.items())};
+                    }}; 
+                }}
+                '''
+        conv = Converter()
+        conv.convert_str(rddl)
+        for o, v in objs.items():
+            p = conv.world.getState(WORLD, Converter.get_feature_name(('p', *o)), unique=True)
+            self.assertEqual(p, v)
+        conv.world.step()
+        for o, v in objs.items():
+            p = conv.world.getState(WORLD, Converter.get_feature_name(('p', *o)), unique=True)
+            self.assertEqual(p, o[0] != o[1])
+
     def test_fluent_multi_param_dyn_const(self):
         objs = {('x1', 'x1'): True,
                 ('x1', 'x2'): False,
