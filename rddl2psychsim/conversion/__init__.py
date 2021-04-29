@@ -93,10 +93,10 @@ class _ConverterBase(object):
     def _get_entity_name(self, name: Tuple) -> Tuple[str, Tuple]:
         name = list(name)
         # searches for agent name in (possibly parameterized) variable's name
-        for ag_name in self.world.agents.keys():
-            if ag_name in name:
-                name.remove(ag_name)
-                return ag_name, tuple(name)
+        for n in name:
+            if n in self.world.agents:
+                name.remove(n)
+                return n, tuple(name)
         return WORLD, tuple(name)  # defaults to world
 
     def _is_enum(self, name: str) -> bool:
@@ -286,7 +286,7 @@ class _ConverterBase(object):
                 action = agent.addAction({'verb': self.get_feature_name(action_name)})
                 actions.append(action)
                 self.actions[agent.name][act_name] = action
-                logging.info(f'Created action "{action}" for agent "{agent}" from action fluent: {fluent}')
+                logging.info(f'Created action "{action}" for agent "{agent.name}" from action fluent: {fluent}')
         return actions
 
     def _initialize_variables(self):
