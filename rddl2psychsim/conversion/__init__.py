@@ -3,7 +3,7 @@ import logging
 import numpy as np
 import scipy.stats as stats
 from collections import OrderedDict
-from typing import List, Tuple, Set
+from typing import List, Tuple, Set, Dict
 from pyrddl.pvariable import PVariable
 from pyrddl.rddl import RDDL
 from psychsim.action import ActionSet
@@ -27,9 +27,9 @@ class _ConverterBase(object):
     turn_order: List[Set[str]]
 
     def __init__(self, normal_stds=NORMAL_STDS, normal_bins=NORMAL_BINS, poisson_exp_rate=POISSON_EXP_RATE):
-        self.features = {}
-        self.constants = {}
-        self.actions = OrderedDict()  # ordered so that the order of agents is as given in RDDL instance
+        self.features: Dict[str, str] = {}
+        self.constants: Dict[str, int or float or bool or str] = {}
+        self.actions: Dict[str, Dict[str, ActionSet]] = OrderedDict()  # order of agents is as given in RDDL instance
         self._feature_param_types = {}
 
         # set distribution discretization params
@@ -38,15 +38,22 @@ class _ConverterBase(object):
         self._normal_probs = (self._normal_probs / self._normal_probs.sum()).tolist()  # normalize to sum 1
         self._poisson_exp_rate = poisson_exp_rate
 
-    def log_state(self, features: List[str] = None) -> None:
+    def log_state(self, features: List[str] = None, log_actions: bool = False) -> None:
         """
         Logs (INFO level) the current state of the PsychSim world.
         Only prints features that were converted from RDDL.
         :param List[str] features: the features whose current value are to be printed. `None` will print all
+        :param bool log_actions: whether to also log agents' actions
         features on record.
         """
         for f in self.features.values():
             if features is None or f in features:
+                val = str(self.world.getFeature(f)).replace('\n', '\t')
+                logging.info(f'{f}: {val}')
+
+        for ag_name in self.actions.keys():
+            if log_actions:
+                f = actionKey(ag_name)
                 val = str(self.world.getFeature(f)).replace('\n', '\t')
                 logging.info(f'{f}: {val}')
 
@@ -74,7 +81,7 @@ class _ConverterBase(object):
     def _is_action(self, name: Tuple, agent: Agent) -> bool:
         return agent.name in self.actions and self.get_feature_name(name) in self.actions[agent.name]
 
-    def _get_action(self, name: Tuple, agent: Agent) -> str:
+    def _get_action(self, name: Tuple, agent: Agent) -> ActionSet:
         return self.actions[agent.name][self.get_feature_name(name)]
 
     def _is_constant(self, name: Tuple) -> bool:

@@ -16,14 +16,16 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description=__desc__)
     parser.add_argument('--input', '-i', type=str, default=RDDL_FILE, help='RDDL file to be converted to PsychSim.')
-    parser.add_argument('--steps', '-s', type=str, default=MAX_STEPS, help='Number of steps to run the simulation.')
+    parser.add_argument('--steps', '-s', type=int, default=MAX_STEPS, help='Number of steps to run the simulation.')
     parser.add_argument('--threshold', '-t', type=float, default=THRESHOLD,
                         help='Stochastic outcomes with a likelihood below this threshold are pruned.')
     parser.add_argument('--select', action='store_true',
                         help='Whether to select an outcome if dynamics are stochastic.')
+    parser.add_argument('--log-actions', action='store_true',
+                        help='Whether to log agents\'s actions in addition to current state.')
     args = parser.parse_args()
 
-    # prepare log t screen
+    # prepare log to screen
     logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s', datefmt='%H:%M:%S')
 
     # parse and convert RDDL file
@@ -40,7 +42,7 @@ if __name__ == '__main__':
         logging.info('\n__________________________________________________')
         logging.info(f'Step {i}:')
         conv.world.step(threshold=args.threshold, select=args.select)
-        conv.log_state()
+        conv.log_state(log_actions=args.log_actions)
         conv.verify_constraints()
 
     logging.info('==================================================')
