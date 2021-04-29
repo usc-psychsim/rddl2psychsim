@@ -6,6 +6,7 @@ from psychsim.agent import Agent
 from psychsim.pwl import KeyedTree, makeFuture, makeTree, CONSTANT, KeyedPlane, KeyedVector
 from rddl2psychsim.conversion.dynamics import _DynamicsConverter
 from rddl2psychsim.conversion.expression import _get_const_val
+from rddl2psychsim.rddl import expression_to_rddl
 
 __author__ = 'Pedro Sequeira'
 __email__ = 'pedrodbs@gmail.com'
@@ -33,12 +34,14 @@ class _ConstraintsConverter(_DynamicsConverter):
             val = state.marginal(makeFuture(_ASSERTION_KEY)).expectation()  # expected / mean value
             # value has to be > 0.5, which is truth value in PsychSim (see psychsim.world.World.float2value)
             if val <= 0.5:
-                err_msg = f'State or action constraint "{expr}" not satisfied given current world state:\n{state}'
+                err_msg = f'State or action constraint "{expression_to_rddl(expr)}" ' \
+                          f'not satisfied given current world state:\n{state}'
                 if self._const_as_assert:
                     raise AssertionError(err_msg)
                 logging.info(err_msg)
 
     def _convert_state_action_constraints(self):
+        logging.info('__________________________________________________')
         for constraint in self.model.domain.constraints:
 
             # check param action legality constraint in the form "forall_p action(p) => constraint" before conversion

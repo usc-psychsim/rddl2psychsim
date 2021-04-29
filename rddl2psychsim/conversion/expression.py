@@ -35,12 +35,12 @@ def _combine_linear_functions(expr1: Dict, expr2: Dict) -> Dict:
     """
     assert _is_linear_function(expr1) and _is_linear_function(expr2), \
         f'Could not parse expression, invalid linear operation in "{expr1}" or "{expr2}"!'
-    expr1 = dict(expr1)  # copies
+    expr1 = dict(expr1)  # copy
     for k, v in expr2.items():
         expr1[k] = expr1[k] + v if k in expr1 else v  # add weight if key already in dict
         if expr1[k] == 0:
             del expr1[k]  # remove if weight is 0
-    return expr1
+    return {CONSTANT: 0} if len(expr1) == 0 else expr1
 
 
 def _negate_linear_function(expr):

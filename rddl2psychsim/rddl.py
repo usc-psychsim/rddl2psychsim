@@ -54,6 +54,9 @@ def expression_to_rddl(expr: Expression, level: int = 0, indent_width: int = 4) 
     if e_type == 'penum':
         return indent + str(args)
 
+    if e_type == 'param':
+        return indent + str(args)
+
     if e_type == 'constant':
         return indent + str(args).lower()
 
