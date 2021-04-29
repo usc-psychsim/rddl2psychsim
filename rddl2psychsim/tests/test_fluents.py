@@ -197,10 +197,10 @@ class TestTypes(unittest.TestCase):
                 '''
         conv = Converter()
         conv.convert_str(rddl)
-        p = conv.world.getState(WORLD, 'p', unique=True)
+        p = conv.world.getState(WORLD, '_p', unique=True)
         self.assertEqual(p, 0)
         conv.world.step()
-        p = conv.world.getState(WORLD, 'p', unique=True)
+        p = conv.world.getState(WORLD, '_p', unique=True)
         self.assertEqual(p, 2)
 
     def test_observ_fluent(self):
@@ -682,14 +682,14 @@ class TestTypes(unittest.TestCase):
         conv = Converter()
         conv.convert_str(rddl)
         agent = next(iter(conv.world.agents.values()))
-        self.assertNotIn(stateKey(WORLD, 'p'), agent.omega)
+        self.assertNotIn(stateKey(WORLD, '__p'), agent.omega)
         self.assertIn(stateKey(WORLD, 'q'), agent.omega)
 
-        p = conv.world.getState(WORLD, 'p', unique=True)
+        p = conv.world.getState(WORLD, '__p', unique=True)
         self.assertEqual(p, 1)
         conv.world.step()
         conv.world.step()
-        p = conv.world.getState(WORLD, 'p', unique=True)
+        p = conv.world.getState(WORLD, '__p', unique=True)
         self.assertEqual(p, 4)
         q = conv.world.getState(WORLD, 'q', unique=True)
         self.assertEqual(q, 3)

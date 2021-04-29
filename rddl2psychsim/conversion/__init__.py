@@ -210,19 +210,19 @@ class _ConverterBase(object):
         logging.info('__________________________________________________')
         self.features = {}
         for sf in self.model.domain.state_fluents.values():
-            self._create_features(sf)
+            self._create_features(sf, '' if len(self.model.domain.observ_fluents) == 0 else '__')
 
         # create features from intermediate fluents
         for sf in self.model.domain.intermediate_fluents.values():
-            self._create_features(sf)
+            self._create_features(sf, '_')
 
-        # create features from non-observable fluents
+        # create features from observable fluents
         for sf in self.model.domain.observ_fluents.values():
             self._create_features(sf)
 
         logging.info(f'Total {len(self.features)} features created')
 
-    def _create_features(self, fluent: PVariable) -> List[str]:
+    def _create_features(self, fluent: PVariable, prefix: str = '') -> List[str]:
         # to whom should this feature be associated, agent or world?
         if fluent.arity > 0:
             # gets all parameter combinations
@@ -239,7 +239,7 @@ class _ConverterBase(object):
         domain = self._get_domain(fluent.range)
         for f_name in f_combs:
             entity, feat_name = self._get_entity_name(f_name)  # tries to identify agent from fluent param comb name
-            f = self.world.defineState(entity, self.get_feature_name(feat_name), *domain)
+            f = self.world.defineState(entity, prefix + self.get_feature_name(feat_name), *domain)
             f_name = self.get_feature_name(f_name)  # keep feature's original name for transparent later referencing
             self.features[f_name] = f
 
