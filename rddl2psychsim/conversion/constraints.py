@@ -1,6 +1,8 @@
 import logging
-from typing import Dict
+from typing import Dict, Tuple, Union
 from pyrddl.expr import Expression
+from psychsim.action import ActionSet
+from psychsim.agent import Agent
 from psychsim.pwl import KeyedTree, makeFuture, makeTree, CONSTANT, KeyedPlane, KeyedVector
 from rddl2psychsim.conversion.dynamics import _DynamicsConverter
 from rddl2psychsim.conversion.expression import _get_const_val
@@ -45,10 +47,12 @@ class _ConstraintsConverter(_DynamicsConverter):
 
                 # combine param substitutions in sub-expression and tries to set legality for each instantiation
                 param_maps = self._get_param_mappings(constraint)
-                legality_set = True
-                for p_map in param_maps:
-                    legality_set &= self._set_action_legality(self._convert_expression(constraint.args[-1], p_map))
-                if legality_set:
+                legality_consts = [self._get_action_legality(self._convert_expression(constraint.args[-1], p_map))
+                                   for p_map in param_maps]
+                if None not in legality_consts:  # we should get a legality tree for all agents, otherwise invalid
+                    for agent, action, legal_tree in legality_consts:
+                        agent.legal[action] = legal_tree
+                        logging.info(f'Set legality constraint for action "{action}" to:\n{legal_tree}')
                     continue  # safely consumed action legality constraints
 
             # otherwise process constraint expression
@@ -65,7 +69,11 @@ class _ConstraintsConverter(_DynamicsConverter):
                 continue
 
             # check for non-param action legality constraint in the form "action => constraint"
-            if self._set_action_legality(expr):
+            legality_const = self._get_action_legality(expr)
+            if legality_const is not None:
+                agent, action, legal_tree = legality_const
+                agent.legal[action] = legal_tree
+                logging.info(f'Set legality constraint for action "{action}" to:\n{legal_tree}')
                 continue
 
             # otherwise store dynamics tree for a (external) boolean variable, for later online assertion
@@ -77,7 +85,7 @@ class _ConstraintsConverter(_DynamicsConverter):
 
         logging.info(f'Total {len(self._constraint_trees)} constraints created')
 
-    def _set_action_legality(self, expr: Dict) -> bool:
+    def _get_action_legality(self, expr: Dict) -> Union[Tuple[Agent, ActionSet, KeyedTree], None]:
         # check for action legality constraint in the form "action => constraint"
         if 'imply' in expr and 'action' in expr['imply'][0]:
             agent = expr['imply'][0]['action'][0]
@@ -88,8 +96,6 @@ class _ConstraintsConverter(_DynamicsConverter):
                           True: legal_tree[True],
                           False: legal_tree[False]}
             legal_tree = makeTree(legal_tree)
-            logging.info(f'Set legality constraint for action "{action}" to:\n{legal_tree}')
-            agent.legal[action] = legal_tree.desymbolize(self.world.symbols)
-            return True
+            return agent, action, legal_tree.desymbolize(self.world.symbols)
 
-        return False  # could not find action legality constraint in the expression
+        return None  # could not find action legality constraint in the expression

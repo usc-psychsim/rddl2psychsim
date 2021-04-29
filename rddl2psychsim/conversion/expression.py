@@ -138,8 +138,8 @@ class _ExpressionConverter(_ConverterBase):
             ag_actions = []
             for agent in self.world.agents.values():
                 if self._is_action(name, agent):
-                    # identify this as agent's *future / current* action
-                    ag_actions.append((agent, self._get_action(name, agent), True))
+                    future = '\'' in name[0]
+                    ag_actions.append((agent, self._get_action(name, agent), future)) # identify this as agent's action
             if len(ag_actions) > 0:
                 # TODO can do plane disjunction when supported in PsychSim
                 # creates OR nested tree for matching any agents' actions
