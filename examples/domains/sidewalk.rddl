@@ -71,7 +71,7 @@ domain sidewalk {
 		walk_right(agent) : { action-fluent, bool, default = false};
 
 		//store if person is at goal
-		atGoal(agent) :   { interm-fluent, bool, level = 3 };
+		atGoal(agent) :   { interm-fluent, bool, level = 4 };
 	};
   
 	
@@ -106,9 +106,9 @@ domain sidewalk {
 		//		else xPos(?p);
 		nextXPos(?p) =
 		    if(walk_left(?p)) then
-                if(numMoves'(?p) == 1 ^ ~outBoundsNext'(?p)) then xPos(?p) - 1 else xPos(?p)
+                if(numMoves(?p) == 1 ^ ~outBoundsNext(?p)) then xPos(?p) - 1 else xPos(?p)
             else if (walk_right(?p)) then
-                if(numMoves'(?p) == 1 ^ ~outBoundsNext'(?p)) then xPos(?p) + 1 else xPos(?p)
+                if(numMoves(?p) == 1 ^ ~outBoundsNext(?p)) then xPos(?p) + 1 else xPos(?p)
             else
                 xPos(?p);
 
@@ -122,33 +122,34 @@ domain sidewalk {
 		//		else yPos(?p);
 		nextYPos(?p) =
 		    if(walk_down(?p)) then
-                if(numMoves'(?p) == 1 ^ ~outBoundsNext'(?p)) then yPos(?p) - 1 else yPos(?p)
+                if(numMoves(?p) == 1 ^ ~outBoundsNext(?p)) then yPos(?p) - 1 else yPos(?p)
             else if (walk_up(?p)) then
-                if(numMoves'(?p) == 1 ^ ~outBoundsNext'(?p)) then yPos(?p) + 1 else yPos(?p)
+                if(numMoves(?p) == 1 ^ ~outBoundsNext(?p)) then yPos(?p) + 1 else yPos(?p)
             else
                 yPos(?p);
 
 		//check if there is conflict on the next locations
-		blocked(?x, ?y) = (?x ~= ?y) ^ (nextXPos'(?x) == nextXPos'(?y)) ^ (nextYPos'(?x) == nextYPos'(?y));
+		blocked(?x, ?y) = (?x ~= ?y) ^ (nextXPos(?x) == nextXPos(?y)) ^ (nextYPos(?x) == nextYPos(?y));
 		  
 		//update xpos unless there was a conflict (stays the same)
-		xPos'(?p) = if(exists_{?x : agent} (blocked'(?p, ?x)))
+		xPos'(?p) = if(exists_{?x : agent} (blocked(?p, ?x)))
 				then xPos(?p)
 			    else
-				nextXPos'(?p);
+				nextXPos(?p);
 
 		//update ypos unless there was a conflict (stays the same)
-		yPos'(?p) =  if(exists_{?x : agent} (blocked'(?p, ?x)))
+		yPos'(?p) =  if(exists_{?x : agent} (blocked(?p, ?x)))
 				then yPos(?p)
 			    else
-				nextYPos'(?p);
+				nextYPos(?p);
 
         // is agent at goal position
-        atGoal(?p) = xPos'(?p) == GOAL(?p);
+        atGoal(?p) = xPos(?p) == GOAL(?p);
 	};
   
 
-	//reward for every player that has reached their x goal.  	
+	//reward for every player that has reached their x goal.
+	//reward = [sum_{?p : agent} xPos(?p) == GOAL(?p)];
 	reward = [sum_{?p : agent} atGoal(?p)];
 	
 
@@ -214,7 +215,8 @@ instance is2 {
   
 	//initialize at different ends of the sidewalk
 	init-state { 
-		xPos(p1) = 2; 
+		xPos(p1) = 2;
+		nextXPos(p1) = 2;   // this is needed otherwise default is 0, leading to inconsistent state
 		xPos(p2) = 0;
 		yPos(p1) = 0;
 		yPos(p2) = 0; 		
