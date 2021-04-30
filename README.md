@@ -27,10 +27,24 @@ TODO
 ## Fluents (variables)
 
 - `non-fluent`, converted into constants to be used for the definition of dynamics for other variables 
+
 - ` state-fluent`, `interm-fluent`, and `observ-fluent`, all converted into PsychSim features
   - <u>Note:</u> `observ-fluent` variables are automatically added to agent's `omega` if `partially-observed` is specified in the `requirements` section
+  
 - `action-fluent`, converted into PsychSim action
-- Supports parameterized (n-arity) predicates by creating state features in PsychSim for all combinations of the parameters in the provided instance
+
+  <u>Notes:</u>
+
+  - Supports parameterized (n-arity) predicates by creating state features in PsychSim for *all* combinations of the parameters in the provided instance
+
+  - Fluent stratification level from RDDL file is used to define the following hierarchy among features:
+
+    1. Actions
+    2. State fluents
+    3. Intermediate fluents (ordered according to the associated stratification `level` parameter)
+    4. Observable fluents
+
+    When creating dynamics' tree for a feature in PsychSim, the future value (current update step) of other features of a *strictly lower* level in the hierarchy is considered, otherwise their past value (previous updated step) is used
 
 ## Constants
 
@@ -131,7 +145,6 @@ Creates a deterministic/stochastic effect for the following distributions:
     else 
     	Discrete(enum_level, @low : 0.2, @medium : 0.5, @high : 0.3);
     ```
-    
 
 to achieve the same effect
 
