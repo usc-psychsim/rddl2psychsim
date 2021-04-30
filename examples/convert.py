@@ -12,6 +12,15 @@ MAX_STEPS = 50
 THRESHOLD = 0
 RDDL_FILE = 'examples/domains/dbn_prop.rddl'
 
+
+def _log_agent_reward(ag_name):
+    true_model = conv.world.agents[ag_name].get_true_model()
+    action = debug[ag_name]['__decision__'][true_model]['action']
+    rwd = debug[ag_name]['__decision__'][true_model]['V'][action]['__ER__']
+    rwd = None if len(rwd) == 0 else rwd[0]
+    logging.info(f'{ag_name}\'s reward: {rwd}')
+
+
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description=__desc__)
@@ -22,7 +31,9 @@ if __name__ == '__main__':
     parser.add_argument('--select', action='store_true',
                         help='Whether to select an outcome if dynamics are stochastic.')
     parser.add_argument('--log-actions', action='store_true',
-                        help='Whether to log agents\'s actions in addition to current state.')
+                        help='Whether to log agents\' actions in addition to current state.')
+    parser.add_argument('--log-rewards', action='store_true',
+                        help='Whether to log agents\' rewards wrt chosen actions in addition to current state.')
     args = parser.parse_args()
 
     # prepare log to screen
@@ -41,8 +52,12 @@ if __name__ == '__main__':
     for i in tqdm(range(args.steps), ):
         logging.info('\n__________________________________________________')
         logging.info(f'Step {i}:')
-        conv.world.step(threshold=args.threshold, select=args.select)
+        debug = {ag_name: {} for ag_name in conv.actions.keys()} if args.log_rewards else set()
+        conv.world.step(debug=debug, threshold=args.threshold, select=args.select)
         conv.log_state(log_actions=args.log_actions)
+        if args.log_rewards:
+            for ag_name in conv.actions.keys():
+                _log_agent_reward(ag_name)
         conv.verify_constraints()
 
     logging.info('==================================================')
