@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, Tuple
+from typing import Dict, Tuple, List, Set
 from pyrddl.expr import Expression
 from psychsim.action import ActionSet
 from psychsim.pwl import KeyedVector, rewardKey, makeTree, makeFuture, KeyedMatrix, KeyedPlane, CONSTANT, \
@@ -15,6 +15,14 @@ class _DynamicsConverter(_ExpressionConverter):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+
+    def _get_dependencies(self, f_name: str) -> Set[str]:
+        if f_name not in self._fluent_levels:
+            return set()
+
+        # adds fluents of level below as dependencies
+        level = self._fluent_levels[f_name]
+        return set([f for f, l in self._fluent_levels.items() if f != f_name and l < level])
 
     def _convert_dynamics(self):
         # create dynamics from conditional probability functions (CPFs)
@@ -37,8 +45,8 @@ class _DynamicsConverter(_ExpressionConverter):
                     f_name = (name, *p_vals)
                     if not self._is_feature(f_name):
                         raise ValueError(f'Could not find feature for fluent "{f_name}" in CPF "{cpf}"!')
-                    f = self._get_feature(f_name)
-                    self._create_dynamics(f, cpf.expr, dict(zip(params, p_vals)))
+                    dependencies = self._get_dependencies(name)
+                    self._create_dynamics(self._get_feature(f_name), cpf.expr, dict(zip(params, p_vals)), dependencies)
             else:
                 raise NotImplementedError(f'Cannot convert CPF "{cpf}" of type "{f_type}"!')
 
@@ -46,14 +54,16 @@ class _DynamicsConverter(_ExpressionConverter):
         # create reward function # TODO assume homogeneous agents
         logging.info('__________________________________________________')
         for agent in self.world.agents.values():
-            expr = self._convert_expression(self.model.domain.reward)
+            expr = self._convert_expression(self.model.domain.reward, dependencies=set())
             tree = makeTree(self._get_dynamics_tree(rewardKey(agent.name), expr))
             agent.setReward(tree, 1.)
             logging.info(f'Set agent "{agent.name}" reward to:\n{tree}')
 
-    def _create_dynamics(self, key: str, expression: Expression, param_map: Dict[str, str] = None) -> None:
+    def _create_dynamics(self, key: str, expression: Expression,
+                         param_map: Dict[str, str] or None = None,
+                         dependencies: Set[str] = None) -> None:
         # tries to get actions responsible for feature update from expression
-        expr = self._convert_expression(expression, param_map)
+        expr = self._convert_expression(expression, param_map, dependencies)
         action_dynamics = self._extract_action_dynamics(expr)
 
         # for each sub-expression, set dynamics for feature as provided by an action (or the world itself)

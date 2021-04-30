@@ -19,6 +19,8 @@ NORMAL_STDS = 3
 NORMAL_BINS = 7
 POISSON_EXP_RATE = 10
 
+MAX_LEVEL = int(1e10)
+
 
 class _ConverterBase(object):
     model: RDDL
@@ -30,7 +32,8 @@ class _ConverterBase(object):
         self.features: Dict[str, str] = {}
         self.constants: Dict[str, int or float or bool or str] = {}
         self.actions: Dict[str, Dict[str, ActionSet]] = OrderedDict()  # order of agents is as given in RDDL instance
-        self._feature_param_types = {}
+        self._fluent_param_types: Dict[str, List[str]] = {}
+        self._fluent_levels: Dict[str, int] = {}
 
         # set distribution discretization params
         self._normal_bins = np.linspace(-normal_stds, normal_stds, normal_bins).tolist()  # gets sample value centers
@@ -134,9 +137,9 @@ class _ConverterBase(object):
         raise ValueError(f'Could not get domain for range type: {t_range}!')
 
     def _get_param_types(self, name: str) -> List[str]:
-        assert name in self._feature_param_types, \
+        assert name in self._fluent_param_types, \
             f'Could not get param types for fluent: {name}, feature not registered!'
-        return self._feature_param_types[name]
+        return self._fluent_param_types[name]
 
     def _get_param_values(self, param_type: str) -> List[str]:
         for p_type, p_vals in self.model.non_fluents.objects:
@@ -223,6 +226,11 @@ class _ConverterBase(object):
         logging.info(f'Total {len(self.features)} features created')
 
     def _create_features(self, fluent: PVariable, prefix: str = '') -> List[str]:
+        # registers types of parameters for this type of feature
+        self._fluent_param_types[fluent.name] = fluent.param_types
+        self._fluent_levels[fluent.name] = fluent.level if fluent.fluent_type == 'interm-fluent' else \
+            -1 if fluent.fluent_type == 'state-fluent' else MAX_LEVEL
+
         # to whom should this feature be associated, agent or world?
         if fluent.arity > 0:
             # gets all parameter combinations
@@ -230,9 +238,6 @@ class _ConverterBase(object):
             f_combs = [(fluent.name, *p_vals) for p_vals in param_vals]
         else:
             f_combs = [(fluent.name, None)]  # not-parameterized feature
-
-        # registers types of parameters for this type of feature
-        self._feature_param_types[fluent.name] = fluent.param_types
 
         # create and register features
         feats = []
@@ -264,6 +269,8 @@ class _ConverterBase(object):
         logging.info(f'Total {sum(len(actions) for actions in self.actions.values())} actions created')
 
     def _create_actions(self, fluent: PVariable) -> List[ActionSet]:
+        self._fluent_levels[fluent.name] = -MAX_LEVEL  # for dynamics, actions always come first
+
         if fluent.arity > 0:
             # gets all parameter combinations
             param_vals = self._get_all_param_combs(fluent.param_types)

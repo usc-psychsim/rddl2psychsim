@@ -448,12 +448,12 @@ class TestMultiagent(unittest.TestCase):
                 types {{ agent : object; }};
                 pvariables {{ 
                     p(agent) : {{ state-fluent, real, default = 0 }};
-                    q : {{ state-fluent, real, default = 0 }};
+                    q : {{ observ-fluent, real }};     // observable to condition on agents' p
                     act : {{ action-fluent, bool, default = false }}; 
                 }};
                 cpfs {{ 
                     p'(?a) = p(?a) + 1;
-                    q' = sum_{{?a : agent}}[ p'(?a) ]; // sum future of agents' p vars
+                    q' = sum_{{?a : agent}}[ p(?a) ];   // sum current agents' p vars
                 }};
                 reward = 0;
             }}
@@ -469,13 +469,13 @@ class TestMultiagent(unittest.TestCase):
         conv = Converter()
         conv.convert_str(rddl)
         for a, v in agents.items():
-            p = conv.world.getState(a, 'p', unique=True)
+            p = conv.world.getState(a, '__p', unique=True)
             self.assertEqual(p, v)
             turn = conv.world.getFeature(turnKey(a), unique=True)
             self.assertEqual(turn, 0)  # all agents on same turn
         conv.world.step()
         for a, v in agents.items():
-            p = conv.world.getState(a, 'p', unique=True)
+            p = conv.world.getState(a, '__p', unique=True)
             self.assertEqual(p, v + 1)
         q = conv.world.getState(WORLD, 'q', unique=True)
         self.assertEqual(q, sum(v + 1 for v in agents.values()))
@@ -487,7 +487,7 @@ class TestMultiagent(unittest.TestCase):
                 types {{ agent : object; }};
                 pvariables {{ 
                     p(agent) : {{ state-fluent, real, default = 0 }};
-                    q : {{ state-fluent, real, default = 0 }};
+                    q : {{ observ-fluent, real }};     // observable to condition on agents' p
                     act(agent) : {{ action-fluent, bool, default = false }}; 
                 }};
                 cpfs {{ 
@@ -496,7 +496,7 @@ class TestMultiagent(unittest.TestCase):
                             else
                                 p(?a);
 
-                    q' = sum_{{?a : agent}}[ p'(?a) ]; // sum future of agents' p vars
+                    q' = sum_{{?a : agent}}[ p(?a) ]; // sum current agents' p vars
                 }};
                 reward = 0;
             }}
@@ -509,14 +509,14 @@ class TestMultiagent(unittest.TestCase):
         conv = Converter()
         conv.convert_str(rddl)
         for i, a in enumerate(agents):
-            p = conv.world.getState(a, 'p', unique=True)
+            p = conv.world.getState(a, '__p', unique=True)
             self.assertEqual(p, 0)
             turn = conv.world.getFeature(turnKey(a), unique=True)
             self.assertEqual(turn, i)
         q_sum = 0.
         for a in agents:
             conv.world.step()
-            p = conv.world.getState(a, 'p', unique=True)
+            p = conv.world.getState(a, '__p', unique=True)
             self.assertEqual(p, 1)
             q_sum += 1
             q = conv.world.getState(WORLD, 'q', unique=True)
@@ -530,7 +530,7 @@ class TestMultiagent(unittest.TestCase):
                 types {{ agent : object; }};
                 pvariables {{ 
                     p(agent) : {{ state-fluent, real, default = 0 }};
-                    q : {{ state-fluent, real, default = 0 }};
+                    q : {{ observ-fluent, real }};     // observable to condition on agents' p
                     act(agent) : {{ action-fluent, bool, default = false }}; 
                 }};
                 cpfs {{ 
@@ -539,7 +539,7 @@ class TestMultiagent(unittest.TestCase):
                             else
                                 p(?a);
 
-                    q' = sum_{{?a : agent}}[ p'(?a) ]; // sum future of agents' p vars
+                    q' = sum_{{?a : agent}}[ p(?a) ]; // sum current agents' p vars
                 }};
                 reward = 0;
             }}
@@ -556,7 +556,7 @@ class TestMultiagent(unittest.TestCase):
         conv = Converter()
         conv.convert_str(rddl)
         for i, a in enumerate(agents):
-            p = conv.world.getState(a, 'p', unique=True)
+            p = conv.world.getState(a, '__p', unique=True)
             self.assertEqual(p, 0)
             turn = conv.world.getFeature(turnKey(a), unique=True)
             self.assertEqual(turn, 0 if i < len(agents) - 1 else 1)
