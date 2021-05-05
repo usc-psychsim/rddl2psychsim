@@ -144,8 +144,8 @@ class _ExpressionConverter(_ConverterBase):
                 params = (None,)
             f_name = (name,) + params
 
-            # check if we should get future (current) or old feature value, from dependency list then from name
-            future = name in dependencies if dependencies is not None else '\'' in name
+            # check if we should get future (current) or old feature value, from dependency list and from name
+            future = '\'' in name or (dependencies is not None and name in dependencies)
             if self._is_feature(f_name):  # check if this variable refers to a known feature
                 f_name = self._get_feature(f_name)
                 return {makeFuture(f_name) if future else f_name: 1.}
