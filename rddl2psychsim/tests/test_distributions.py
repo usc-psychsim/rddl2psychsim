@@ -104,7 +104,7 @@ class TestTypes(unittest.TestCase):
         self.assertEqual(p['medium'], 0.2)
         self.assertEqual(p['high'], 0.3)
 
-    def test_discrete_invalid_non_const(self):
+    def test_discrete_enum_invalid_non_const(self):
         rddl = '''
                 domain my_test {
                     types {
@@ -130,7 +130,7 @@ class TestTypes(unittest.TestCase):
         with self.assertRaises(AssertionError):
             conv.convert_str(rddl)
 
-    def test_discrete_const(self):
+    def test_discrete_enum_const(self):
         rddl = '''
                 domain my_test {
                     types {
@@ -159,7 +159,7 @@ class TestTypes(unittest.TestCase):
         self.assertEqual(p['medium'], 0.6)
         self.assertEqual(p['high'], 0.3)
 
-    def test_discrete_invalid_sum(self):
+    def test_discrete_enum_invalid_sum(self):
         rddl = '''
                 domain my_test {
                     types {

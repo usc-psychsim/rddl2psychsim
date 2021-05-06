@@ -1,5 +1,6 @@
 import logging
 import math
+import numpy as np
 from typing import Dict, Union, List, Set
 from pyrddl.expr import Expression
 from psychsim.pwl import CONSTANT, makeFuture
@@ -531,10 +532,10 @@ class _ExpressionConverter(_ConverterBase):
                 if v > 0:
                     dist.append(({CONSTANT: k}, v))
 
-            assert sum(v for _, v in dist) == 1, \
+            assert np.isclose(np.sum(v for _, v in dist), 1), \
                 f'Cannot parse stochastic expression: "{expression_to_rddl(expression)}", ' \
                 f'probabilities have to sum to 1!'
-            return {'distribution': dist}
+            return dist[0][0] if len(dist) == 1 else {'distribution': dist}
 
         if d_type == 'Normal':
             # check params, have to be linear functions

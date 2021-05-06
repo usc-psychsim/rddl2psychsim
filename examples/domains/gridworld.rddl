@@ -1,0 +1,137 @@
+/////////////////////////////////////////////////////////////////////
+// A simple gridworld environment with movement actions and a goal
+// location that provides the agent with a reward. Movement dynamics
+// are influenced by wind, which with a certain probability moves the
+// agent in a random direction.
+//
+// Author: Pedro Sequeira (pedrodbs@gmail.com)
+//
+/////////////////////////////////////////////////////////////////////
+domain gridworld {
+
+    requirements = {
+		concurrent          // multiagent parallel actions
+	};
+
+	types {
+  		agent : object;     // to support multiagent domain
+  		direction : {@left, @right, @up, @down, @no-op };
+	};
+
+    pvariables {
+
+        // environment parameters
+        WIDTH:  { non-fluent, int, default = 10 };
+        HEIGHT: { non-fluent, int, default = 10 };
+        REWARD: { non-fluent, real, default = 1 };
+        P-WIND: { non-fluent, real, default = 0.1 };
+
+        // agents' goal location
+        GOAL-X(agent) : { non-fluent, int, default = 5 };
+        GOAL-Y(agent) : { non-fluent, int, default = 5 };
+
+        // agents' location
+        x-pos(agent) : { observ-fluent, int };
+		y-pos(agent) : { observ-fluent, int };
+		at-goal(agent): { observ-fluent, bool };
+		next-dir(agent): { interm-fluent, direction, level = 1 };
+
+        // actions
+        do_nothing(agent) : { action-fluent, bool, default = false };
+		move-up(agent) :    { action-fluent, bool, default = false };
+		move-down(agent) :  { action-fluent, bool, default = false };
+		move-left(agent) :  { action-fluent, bool, default = false };
+		move-right(agent) : { action-fluent, bool, default = false };
+    };
+
+    cpfs {
+
+        // next direction based on actions and wind
+        next-dir(?a) =
+            if ( move-left(?a) ) then
+                Discrete(direction, @left   : 1 - P-WIND + P-WIND/5,
+                                    @right  : P-WIND/5,
+                                    @up     : P-WIND/5,
+                                    @down   : P-WIND/5,
+                                    @no-op  : P-WIND/5)
+            else if ( move-right(?a) ) then
+                Discrete(direction, @left   : P-WIND/5,
+                                    @right  : 1 - P-WIND + P-WIND/5,
+                                    @up     : P-WIND/5,
+                                    @down   : P-WIND/5,
+                                    @no-op  : P-WIND/5)
+            else if ( move-up(?a) ) then
+                Discrete(direction, @left   : P-WIND/5,
+                                    @right  : P-WIND/5,
+                                    @up     : 1 - P-WIND + P-WIND/5,
+                                    @down   : P-WIND/5,
+                                    @no-op  : P-WIND/5)
+            else if ( move-down(?a) ) then
+                Discrete(direction, @left   : P-WIND/5,
+                                    @right  : P-WIND/5,
+                                    @up     : P-WIND/5,
+                                    @down   : 1 - P-WIND + P-WIND/5,
+                                    @no-op  : P-WIND/5)
+            else
+                Discrete(direction, @left   : P-WIND/5,
+                                    @right  : P-WIND/5,
+                                    @up     : P-WIND/5,
+                                    @down   : P-WIND/5,
+                                    @no-op  : 1 - P-WIND + P-WIND/5);
+
+        // horizontal movement
+        x-pos(?a) = switch( next-dir(?a) ) {
+				case @left  : if (x-pos(?a) > 0) then x-pos(?a) - 1 else x-pos(?a),
+				case @right : if (x-pos(?a) < WIDTH - 1) then x-pos(?a) + 1 else x-pos(?a),
+				default     : x-pos(?a) };
+
+        // vertical movement
+        y-pos(?a) = switch( next-dir(?a) ) {
+				case @down  : if (y-pos(?a) > 0) then y-pos(?a) - 1 else y-pos(?a),
+				case @up    : if (y-pos(?a) < HEIGHT - 1) then y-pos(?a) + 1 else y-pos(?a),
+				default     : y-pos(?a) };
+
+        at-goal'(?a) = x-pos'(?a) == GOAL-X(?a) ^ y-pos'(?a) == GOAL-Y(?a);
+
+    };
+
+    // reward given if agent is at goal
+    reward = sum_{?a : agent} [ at-goal(?a) * REWARD ];
+
+    state-action-constraints {
+
+        // actions legality constraints
+        forall_{?a: agent} [ move-left(?a) => x-pos(?a) > 0 ];
+        forall_{?a: agent} [ move-right(?a) => x-pos(?a) < WIDTH - 1 ];
+        forall_{?a: agent} [ move-down(?a) => y-pos(?a) > 0 ];
+        forall_{?a: agent} [ move-up(?a) => y-pos(?a) < HEIGHT - 1 ];
+
+        // position constraints
+        forall_{?a: agent} [ x-pos(?a) >= 0 ^ y-pos(?a) >= 0 ^ x-pos(?a) < WIDTH ^ y-pos(?a) < HEIGHT ];
+    };
+}
+
+
+non-fluents single_10 {
+	domain = gridworld;
+	objects { agent : {a1 }; };
+	non-fluents {
+		WIDTH = 10;
+		HEIGHT = 10;
+		REWARD = 100;
+		P-WIND = 0.0;
+		GOAL-X(a1) = 9;
+		GOAL-Y(a1) = 9;
+	};
+}
+
+instance single_10 {
+	domain = gridworld;
+	non-fluents = single_10;
+	init-state {
+		x-pos(a1) = 0;
+		y-pos(a1) = 0;
+	};
+	horizon  = 5;
+	discount = 0.9;
+}
