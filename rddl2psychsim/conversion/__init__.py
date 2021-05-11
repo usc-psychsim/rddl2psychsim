@@ -60,6 +60,9 @@ class _ConverterBase(object):
                 val = str(self.world.getFeature(f)).replace('\n', '\t')
                 logging.info(f'{f}: {val}')
 
+    def get_agents(self):
+        return list(self.world.agents.keys())
+
     @staticmethod
     def get_feature_name(f: Tuple) -> str:
         """

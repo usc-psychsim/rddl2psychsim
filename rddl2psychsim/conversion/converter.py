@@ -39,6 +39,3 @@ class Converter(_ConstraintsConverter):
         self._convert_dynamics()
         self._convert_state_action_constraints()
         self._parse_requirements()
-
-    def get_players(self):
-        return list(self.world.agents.keys())
