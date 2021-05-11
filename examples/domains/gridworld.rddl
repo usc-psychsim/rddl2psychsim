@@ -31,17 +31,17 @@ domain gridworld {
         GOAL-Y(agent) : { non-fluent, int, default = 5 };
 
         // agents' location
-        x-pos(agent) : { observ-fluent, int };
-		y-pos(agent) : { observ-fluent, int };
-		at-goal(agent): { observ-fluent, bool };
-		next-dir(agent): { interm-fluent, direction, level = 1 };
+        x-pos(agent)    : { observ-fluent, int };
+		y-pos(agent)    : { observ-fluent, int };
+		at-goal(agent)  : { observ-fluent, bool };
+		next-dir(agent) : { interm-fluent, direction, level = 1 };
 
         // actions
-        do_nothing(agent) : { action-fluent, bool, default = false };
-		move-up(agent) :    { action-fluent, bool, default = false };
-		move-down(agent) :  { action-fluent, bool, default = false };
-		move-left(agent) :  { action-fluent, bool, default = false };
-		move-right(agent) : { action-fluent, bool, default = false };
+        do_nothing(agent)   : { action-fluent, bool, default = false };
+		move-up(agent)      : { action-fluent, bool, default = false };
+		move-down(agent)    : { action-fluent, bool, default = false };
+		move-left(agent)    : { action-fluent, bool, default = false };
+		move-right(agent)   : { action-fluent, bool, default = false };
     };
 
     cpfs {

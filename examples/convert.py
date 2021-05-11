@@ -14,6 +14,8 @@ RDDL_FILE = 'examples/domains/dbn_prop.rddl'
 
 
 def _log_agent_reward(ag_name):
+    if '__decision__' not in debug[ag_name]:
+        return
     true_model = conv.world.agents[ag_name].get_true_model()
     action = debug[ag_name]['__decision__'][true_model]['action']
     rwd = debug[ag_name]['__decision__'][true_model]['V'][action]['__ER__']
