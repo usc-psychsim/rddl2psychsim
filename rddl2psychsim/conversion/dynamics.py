@@ -73,11 +73,21 @@ class _DynamicsConverter(_ExpressionConverter):
             logging.info(f'Set dynamics for feature "{key}" associated with "{action}" to:\n{tree}')
 
     def _extract_action_dynamics(self, expression: Dict) -> Dict[ActionSet or bool, Dict]:
-        # check if we can pull actions from the sub-expressions
-        if 'if' in expression and 'action' in expression['if']:
-            # assigns dynamics to action and processes rest of expression
-            _, action, _ = expression['if']['action']
-            dynamics = {action: expression[True]}
+
+        def _get_act_disjunction(expr):
+            if 'action' in expr:
+                _, action, _ = expr['action']  # add to list of actions
+                actions.add(action)
+                return True
+            if 'logic_or' in expr:
+                return all(_get_act_disjunction(sub_expr) for sub_expr in expr['logic_or'])
+            return False  # top expression is not a disjunction of actions
+
+        # check if we can pull actions from the sub-expressions in the form "if (action [or action...]) then dyn_expr"
+        actions = set()
+        if 'if' in expression and _get_act_disjunction(expression['if']):
+            # assigns dynamics to actions and processes rest of expression
+            dynamics = {action: expression[True] for action in actions}
             dynamics.update(self._extract_action_dynamics(expression[False]))
             return dynamics
         else:

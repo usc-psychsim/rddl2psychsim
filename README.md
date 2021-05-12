@@ -234,6 +234,19 @@ and *action-conditioned dynamics*, via
 x'(?a) = if ( action1(?a) ) then ... else if ( action2(?a) ) then ... else ...;
 ````
 
+for agent-parameterized fluents, or via
+
+```yacas
+x' = if ( exists_{?a: agent}[action1(?a)] ) then 
+    ... 
+else if ( exists_{?a: agent}[action2(?a)] ) then 
+    ... 
+else 
+    ...;
+```
+
+for non-agent-parameterized (world) fluents.
+
 We can also parameterize fluents and actions with other object types. The order in which the `agent` parameter appears is not relevant, i.e., `pos(agent, x_coord, y_coord)` is equivalent to `pos(x_coord, agent, y_coord)`.
 
 <u>Note:</u> however the order of the other parameters *does* matter.

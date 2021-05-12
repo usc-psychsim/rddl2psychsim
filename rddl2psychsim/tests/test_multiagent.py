@@ -357,25 +357,25 @@ class TestMultiagent(unittest.TestCase):
                 else:
                     self.assertNotIn(a, legal_acts)
 
-    def test_actions_conditions(self):
-        rddl = f'''
-                domain my_test {{
-                    pvariables {{ 
-                        p : {{ state-fluent,  int, default = 0 }};
-                        a1 : {{ action-fluent, bool, default = false }}; 
-                        a2 : {{ action-fluent, bool, default = false }}; 
-                    }};
-                    cpfs {{ p' = if (a1) then
+    def test_actions_conditions_single(self):
+        rddl = '''
+                domain my_test {
+                    pvariables { 
+                        p : { state-fluent,  int, default = 0 };
+                        a1 : { action-fluent, bool, default = false }; 
+                        a2 : { action-fluent, bool, default = false }; 
+                    };
+                    cpfs { p' = if (a1) then
                                     p + 1
                                 else if (a2) then
                                     p - 1
                                 else
                                     0;
-                    }};
+                    };
                     reward = -p;
-                }}
-                non-fluents my_test_empty {{ domain = my_test; }}
-                instance my_test_inst {{ domain = my_test; init-state {{ a1; }}; horizon  = 2; }}
+                }
+                non-fluents my_test_empty { domain = my_test; }
+                instance my_test_inst { domain = my_test; init-state { a1; }; horizon  = 2; }
                 '''
         conv = Converter(const_as_assert=True)
         conv.convert_str(rddl)
@@ -383,6 +383,47 @@ class TestMultiagent(unittest.TestCase):
         for ag_name in conv.world.agents.keys():
             a1 = conv.actions[ag_name]['a1']
             a2 = conv.actions[ag_name]['a2']
+            p = stateKey(WORLD, 'p')
+            self.assertIn(a1, conv.world.dynamics)
+            self.assertIn(a2, conv.world.dynamics)
+            self.assertIn(True, conv.world.dynamics)
+            self.assertIn(p, conv.world.dynamics[a1])
+            self.assertIn(p, conv.world.dynamics[a2])
+            self.assertIn(p, conv.world.dynamics[True])
+            self.assertIn(a1, conv.world.dynamics[p])
+            self.assertIn(a2, conv.world.dynamics[p])
+            self.assertIn(True, conv.world.dynamics[p])
+
+    def test_actions_conditions_multi(self):
+        rddl = '''
+                domain my_test {
+                    types { agent : object; };
+                    pvariables { 
+                        p : { state-fluent,  int, default = 0 };
+                        a1(agent) : { action-fluent, bool, default = false }; 
+                        a2(agent) : { action-fluent, bool, default = false }; 
+                    };
+                    cpfs { p' = if (exists_{?a : agent} [a1(?a)] ) then
+                                    p + 1
+                                else if ( exists_{?a : agent} [a2(?a)] ) then
+                                    p - 1
+                                else
+                                    0;
+                    };
+                    reward = -p;
+                }
+                non-fluents my_test_empty { 
+                    domain = my_test; 
+                    objects { agent: { Paul, John, George, Ringo }; };
+                 }
+                instance my_test_inst { domain = my_test; init-state { p = 0; }; horizon  = 2; }
+                '''
+        conv = Converter(const_as_assert=True)
+        conv.convert_str(rddl)
+        conv.world.step()
+        for ag_name in conv.world.agents.keys():
+            a1 = conv.actions[ag_name][Converter.get_feature_name(('a1', ag_name))]
+            a2 = conv.actions[ag_name][Converter.get_feature_name(('a2', ag_name))]
             p = stateKey(WORLD, 'p')
             self.assertIn(a1, conv.world.dynamics)
             self.assertIn(a2, conv.world.dynamics)
