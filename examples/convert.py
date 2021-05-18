@@ -17,8 +17,9 @@ def _log_agent_reward(ag_name):
     if '__decision__' not in debug[ag_name]:
         return
     true_model = conv.world.agents[ag_name].get_true_model()
-    action = debug[ag_name]['__decision__'][true_model]['action']
-    rwd = debug[ag_name]['__decision__'][true_model]['V'][action]['__ER__']
+    decision = debug[ag_name]['__decision__'][true_model]
+    action = decision['action']
+    rwd = decision['V'][action]['__ER__'] if 'V' in decision else []
     rwd = None if len(rwd) == 0 else rwd[0]
     logging.info(f'{ag_name}\'s reward: {rwd}')
 

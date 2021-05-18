@@ -47,48 +47,48 @@ class _ConstraintsConverter(_DynamicsConverter):
             # check param action legality constraint in the form "forall_p action(p) => constraint" before conversion
             if constraint.etype[0] == 'aggregation' and constraint.etype[1] == 'forall' and \
                     constraint.args[-1].etype[0] == 'boolean' and constraint.args[-1].etype[1] == '=>':
-
                 # combine param substitutions in sub-expression and tries to set legality for each instantiation
-                param_maps = self._get_param_mappings(constraint)
-                legality_consts = [self._get_action_legality(self._convert_expression(constraint.args[-1], p_map))
-                                   for p_map in param_maps]
-                if None not in legality_consts:  # we should get a legality tree for all agents, otherwise invalid
-                    for agent, action, legal_tree in legality_consts:
-                        agent.legal[action] = legal_tree
-                        logging.info(f'Set legality constraint for action "{action}" to:\n{legal_tree}')
-                    continue  # safely consumed action legality constraints
-
-            # otherwise process constraint expression
-            expr = self._convert_expression(constraint)
-
-            # if it's a constant-value constraint, we can assert it right now, at conversion time
-            const_val = _get_const_val(expr)
-            if const_val is not None:
-                if not bool(const_val):
-                    err_msg = f'Constant state or action constraint "{constraint}" not satisfied!'
-                    if self._const_as_assert:
-                        raise AssertionError(err_msg)
-                    logging.info(err_msg)
-                continue
-
-            # check for non-param action legality constraint in the form "action => constraint"
-            legality_const = self._get_action_legality(expr)
-            if legality_const is not None:
-                agent, action, legal_tree = legality_const
-                agent.legal[action] = legal_tree
-                logging.info(f'Set legality constraint for action "{action}" to:\n{legal_tree}')
-                continue
-
-            # otherwise store dynamics tree for a (external) boolean variable, for later online assertion
-            tree = makeTree(self._get_dynamics_tree(
-                _ASSERTION_KEY, self._get_pwl_tree(expr, {CONSTANT: True}, {CONSTANT: False})))
-            tree = tree.desymbolize(self.world.symbols)
-            self._constraint_trees[tree] = constraint
-            logging.info(f'Added dynamic state constraint:\n{tree}')
+                for param_map in self._get_param_mappings(constraint):
+                    self._convert_state_action_constraint(constraint.args[-1], param_map)
+            else:
+                # otherwise process normal constraint expression
+                self._convert_state_action_constraint(constraint)
 
         logging.info(f'Total {len(self._constraint_trees)} constraints created')
 
-    def _get_action_legality(self, expr: Dict) -> Union[Tuple[Agent, ActionSet, KeyedTree], None]:
+    def _convert_state_action_constraint(self, constraint: Expression, param_map: Dict[str, str] = None):
+        expr = self._convert_expression(constraint, param_map)
+
+        # if it's a constant-value constraint, we can assert it right now, at conversion time
+        const_val = _get_const_val(expr)
+        if const_val is not None:
+            if not bool(const_val):
+                err_msg = f'Constant state or action constraint "{constraint}" not satisfied!'
+                if self._const_as_assert:
+                    raise AssertionError(err_msg)
+                logging.info(err_msg)
+            logging.info(f'State or action constraint "{constraint}" is always satisfied')
+            return
+
+        # check for non-param action legality constraint in the form "action => constraint"
+        legality_const = self._get_action_legality(expr)
+        if legality_const is True:
+            logging.info(f'Action constraint "{constraint}" is always satisfied')
+            return
+        if legality_const is not None:
+            agent, action, legal_tree = legality_const
+            agent.legal[action] = legal_tree
+            logging.info(f'Set legality constraint for action "{action}" to:\n{legal_tree}')
+            return
+
+        # otherwise store dynamics tree for a (external) boolean variable, for later online assertion
+        tree = makeTree(self._get_dynamics_tree(
+            _ASSERTION_KEY, self._get_pwl_tree(expr, {CONSTANT: True}, {CONSTANT: False})))
+        tree = tree.desymbolize(self.world.symbols)
+        self._constraint_trees[tree] = constraint
+        logging.info(f'Added dynamic state constraint:\n{tree}')
+
+    def _get_action_legality(self, expr: Dict) -> Union[Tuple[Agent, ActionSet, KeyedTree], None, bool]:
         # check for action legality constraint in the form "action => constraint"
         if 'imply' in expr and 'action' in expr['imply'][0]:
             agent = expr['imply'][0]['action'][0]
@@ -100,5 +100,15 @@ class _ConstraintsConverter(_DynamicsConverter):
                           False: legal_tree[False]}
             legal_tree = makeTree(legal_tree)
             return agent, action, legal_tree.desymbolize(self.world.symbols)
+
+        if 'action' in expr or _get_const_val(expr, bool):
+            # if constraint is true or only depends on action, then no need to set legality (always legal)
+            return True
+
+        if 'not' in expr and 'action' in expr['not']:
+            # if "not action", probably rhs of implication was False, so action always illegal
+            agent = expr['not']['action'][0]
+            action = expr['not']['action'][1]
+            return agent, action, makeTree(False)
 
         return None  # could not find action legality constraint in the expression

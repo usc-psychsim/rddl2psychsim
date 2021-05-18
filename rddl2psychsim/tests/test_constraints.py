@@ -1,5 +1,5 @@
 import unittest
-from psychsim.pwl import WORLD, actionKey
+from psychsim.pwl import WORLD, actionKey, makeTree
 from rddl2psychsim.conversion.converter import Converter
 
 __author__ = 'Pedro Sequeira'
@@ -129,20 +129,16 @@ class TestConstraints(unittest.TestCase):
                     };
                     cpfs { p' = p + 1; };
                     reward = 0;
-                    state-action-constraints { ~a; };   // action is always true 
+                    state-action-constraints { ~a; };   // no legal actions
                 }
                 non-fluents my_test_empty { domain = my_test; }
                 instance my_test_inst { domain = my_test; init-state { a; }; }
                 '''
         conv = Converter(const_as_assert=True)
         conv.convert_str(rddl)
-        p = conv.world.getState(WORLD, 'p', unique=True)
-        self.assertEqual(p, 0)
-        conv.world.step()
-        p = conv.world.getState(WORLD, 'p', unique=True)
-        self.assertEqual(p, 1)
-        with self.assertRaises(AssertionError):
-            conv.verify_constraints()
+        ag_name = next(iter(conv.world.agents.keys()))
+        legal_acts = conv.world.agents[ag_name].getLegalActions()
+        self.assertEqual(len(legal_acts), 0)
 
     def test_actions_legal(self):
         rddl = '''
@@ -180,6 +176,47 @@ class TestConstraints(unittest.TestCase):
         self.assertEqual(a, a1 if q > 1 else a2)
         p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, p_ + 2 if a == a1 else p_ - 2)
+
+    def test_actions_legal_const(self):
+        rddl = '''
+                domain my_test {
+                    pvariables { 
+                        p : { state-fluent,  int, default = 0 };
+                        q : { non-fluent,  int, default = 1 };
+                        a1 : { action-fluent, bool, default = false }; 
+                        a2 : { action-fluent, bool, default = false }; 
+                    };
+                    cpfs { p' = if (a1') then
+                                    p + 2
+                                else if (a2') then
+                                    p - 2
+                                else
+                                    100;
+                    };
+                    reward = p;
+                    state-action-constraints { a1 => q > 1; a2 => q <= 1; }; 
+                }
+                non-fluents my_test_empty { domain = my_test; }
+                instance my_test_inst { domain = my_test; init-state { a1; }; horizon  = 3; }
+                '''
+        conv = Converter(const_as_assert=True)
+        conv.convert_str(rddl)
+
+        ag_name, agent = next(iter(conv.world.agents.items()))
+        a1 = conv.actions[ag_name]['a1']
+        a2 = conv.actions[ag_name]['a2']
+        self.assertIn(a1, agent.legal)
+        self.assertEqual(agent.legal[a1], makeTree(False))
+        self.assertNotIn(a2, agent.legal)
+
+        legal_acts = conv.world.agents[ag_name].getLegalActions()
+        self.assertIn(a2, legal_acts)
+
+        p_ = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p_, 0)
+        conv.world.step()
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p, p_ - 2)
 
     def test_actions_param_legal(self):
         objs = {'x1': True, 'x2': False, 'x3': False, 'x4': True}
