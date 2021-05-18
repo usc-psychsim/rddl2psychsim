@@ -106,21 +106,23 @@ class _ConverterBase(object):
         return WORLD, tuple(name)  # defaults to world
 
     def _is_enum(self, name: str) -> bool:
-        for t, _ in self.model.domain.types:
-            if t == name:
+        for t_name, t_vals in self.model.domain.types:
+            if t_name == name and isinstance(t_vals, list) and len(t_vals) > 0:
                 return True
         return False
 
-    def _is_enum_type(self, name: str) -> bool:
-        for _, r in self.model.domain.types:
-            if name in r or '@' + name in r:
+    def _is_enum_value(self, name: str) -> bool:
+        for t_name, t_vals in self.model.domain.types:
+            if self._is_enum(t_name) and (name in t_vals or '@' + name in t_vals):
                 return True
         return False
 
-    def _get_enum_types(self, name: str) -> List[str] or None:
-        for t, r in self.model.domain.types:
-            if t == name:
-                return [_.replace('@', '') for _ in r]  # strip "@" character from enum values
+    def _get_enum_values(self, name: str) -> List[str] or None:
+        if not self._is_enum(name):
+            return None
+        for t_name, t_vals in self.model.domain.types:
+            if t_name == name:
+                return [_.replace('@', '') for _ in t_vals]  # strip "@" character from enum values
         return None
 
     def _get_domain(self, t_range):
@@ -133,7 +135,7 @@ class _ConverterBase(object):
             return float, 0.
 
         # checks enumerated / custom types
-        domain = self._get_enum_types(t_range)
+        domain = self._get_enum_values(t_range)
         if domain is not None:
             return list, domain
 
@@ -145,7 +147,9 @@ class _ConverterBase(object):
         return self._fluent_param_types[name]
 
     def _get_param_values(self, param_type: str) -> List[str]:
-        for p_type, p_vals in self.model.non_fluents.objects:
+        if self._is_enum(param_type):  # check enum type
+            return self._get_enum_values(param_type)
+        for p_type, p_vals in self.model.non_fluents.objects:  # check object instance type
             if p_type == param_type:
                 return p_vals
         raise ValueError(f'Could not get values for param type: {param_type}!')

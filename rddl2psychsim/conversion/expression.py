@@ -103,7 +103,7 @@ class _ExpressionConverter(_ConverterBase):
         belongs to the set of known enumerated types for the domain.
         Returns `False` otherwise.
         """
-        return isinstance(expr, dict) and len(expr) == 1 and CONSTANT in expr and self._is_enum_type(expr[CONSTANT])
+        return isinstance(expr, dict) and len(expr) == 1 and CONSTANT in expr and self._is_enum_value(expr[CONSTANT])
 
     def _get_param_mappings(self, expression: Expression) -> List[Dict[str, str]]:
         # get mappings in the form param -> param type value for each param combination
@@ -125,7 +125,7 @@ class _ExpressionConverter(_ConverterBase):
         if e_type == 'penum':
             # just check if enumerated type is known
             val = args.replace('@', '')
-            if self._is_enum_type(val):
+            if self._is_enum_value(val):
                 return {CONSTANT: val}
             raise ValueError(f'Could not find enumerated type from RDDL expression "{expression_to_rddl(expression)}"!')
 
@@ -509,7 +509,7 @@ class _ExpressionConverter(_ConverterBase):
         if d_type == 'Discrete':
             def _get_value(val):
                 if isinstance(val_type, tuple) and val_type[0] == 'enum_type' and self._is_enum(val_type[1]):
-                    if self._is_enum_type(val):
+                    if self._is_enum_value(val):
                         return val.replace('@', '')
                     raise ValueError(f'Cannot parse stochastic expression: "{expression_to_rddl(expression)}", '
                                      f'unknown enum value "{val}" for type "{val_type}"')
