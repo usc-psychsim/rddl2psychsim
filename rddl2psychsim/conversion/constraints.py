@@ -5,7 +5,7 @@ from psychsim.action import ActionSet
 from psychsim.agent import Agent
 from psychsim.pwl import KeyedTree, makeFuture, makeTree, CONSTANT, KeyedPlane, KeyedVector
 from rddl2psychsim.conversion.dynamics import _DynamicsConverter
-from rddl2psychsim.conversion.expression import _get_const_val
+from rddl2psychsim.conversion.expression import _get_const_val, _is_linear_function
 from rddl2psychsim.rddl import expression_to_rddl
 
 __author__ = 'Pedro Sequeira'
@@ -93,11 +93,8 @@ class _ConstraintsConverter(_DynamicsConverter):
         if 'imply' in expr and 'action' in expr['imply'][0]:
             agent = expr['imply'][0]['action'][0]
             action = expr['imply'][0]['action'][1]
-            legal_tree = self._get_pwl_tree(expr['imply'][1], True, False)  # get condition expression as if tree
-            weights, threshold, comp = legal_tree['if']
-            legal_tree = {'if': KeyedPlane(KeyedVector(weights), threshold, comp),
-                          True: legal_tree[True],
-                          False: legal_tree[False]}
+            # get condition expression as 'if' legality tree
+            legal_tree = self._get_legality_tree(self._get_pwl_tree(expr['imply'][1], True, False))
             legal_tree = makeTree(legal_tree)
             return agent, action, legal_tree.desymbolize(self.world.symbols)
 
@@ -112,3 +109,37 @@ class _ConstraintsConverter(_DynamicsConverter):
             return agent, action, makeTree(False)
 
         return None  # could not find action legality constraint in the expression
+
+    def _get_legality_tree(self, expr: Dict) -> Dict:
+        if not isinstance(expr, dict):
+            return expr
+
+        # just get the truth value of logical expressions
+        op = next(iter(expr.keys()))
+        if len(expr) == 1 and op in \
+                {'linear_and', 'logic_and', 'linear_or', 'logic_or', 'not', 'equiv', 'imply',
+                 'eq', 'neq', 'gt', 'lt', 'geq', 'leq',
+                 'action'}:
+            if _get_const_val(expr[op]) is not None:
+                return self._get_legality_tree(expr[op])  # no need for tree if it's a constant value
+            return self._get_legality_tree(self._get_pwl_tree(expr, {CONSTANT: True}, {CONSTANT: False}))
+
+        if 'if' in expr and len(expr) == 3:
+            # check if no comparison provided, expression's truth value has to be resolved
+            if len(expr['if']) == 1:
+                return self._get_legality_tree(self._get_pwl_tree(expr['if'], expr[True], expr[False]))
+
+            # build if-then-else tree
+            weights, threshold, comp = expr['if']
+            return {'if': KeyedPlane(KeyedVector(weights), threshold, comp),
+                    True: self._get_legality_tree(expr[True]),
+                    False: self._get_legality_tree(expr[False])}
+
+        # default: assumes linear combination of all features in vector has to be > 0.5,
+        # which is truth value in PsychSim (see psychsim.world.World.float2value)
+        if _is_linear_function(expr) or self._is_enum_expr(expr):
+            return {'if': (expr, 0.5, 1),
+                    True: True,
+                    False: False}
+
+        raise NotImplementedError(f'Could not parse RDDL expression, got invalid legality tree: "{expr}"!')
