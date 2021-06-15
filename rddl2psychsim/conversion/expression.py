@@ -214,6 +214,10 @@ class _ExpressionConverter(_ConverterBase):
             return _combine_linear_functions(lhs, rhs)
 
         if a_type == '-':
+            # check equal sides, return 0
+            if lhs == rhs:
+                return {CONSTANT: 0}
+            # check all constants
             if all_consts:
                 return {CONSTANT: lhs_const - rhs_const}  # reduce
             if len(rhs) == 0:
@@ -233,6 +237,9 @@ class _ExpressionConverter(_ConverterBase):
             raise ValueError(f'Non-PWL operation is not supported: "{expression_to_rddl(expression)}"!')
 
         elif a_type == '/':
+            # check equal sides, return 1
+            if lhs == rhs:
+                return {CONSTANT: 1}
             # if division, only works if right or both sides are constants
             if all_consts:
                 return {CONSTANT: lhs_const / rhs_const}  # reduce
@@ -261,6 +268,9 @@ class _ExpressionConverter(_ConverterBase):
                 return lhs if rhs_const else {CONSTANT: False}
             if lhs_const is not None:
                 return rhs if lhs_const else {CONSTANT: False}
+            # check equal sides, return one of them
+            if lhs == rhs:
+                return lhs
             orig_lhs = lhs
             if 'linear_and' in lhs and len(lhs) == 1:
                 lhs = lhs['linear_and']  # tries to combine several AND together
@@ -284,6 +294,9 @@ class _ExpressionConverter(_ConverterBase):
                 return {CONSTANT: True} if rhs_const else lhs
             if lhs_const is not None:
                 return {CONSTANT: True} if lhs_const else rhs
+            # check equal sides, return one of them
+            if lhs == rhs:
+                return lhs
             orig_lhs = lhs
             if 'linear_or' in lhs and len(lhs) == 1:
                 lhs = lhs['linear_or']  # tries to combine several OR together
@@ -323,6 +336,9 @@ class _ExpressionConverter(_ConverterBase):
             # if IMPLICATION, false only if left is true and right is false
             if all_consts:
                 return {CONSTANT: rhs_const or not lhs_const}
+            # check equal sides, always True
+            if lhs == rhs:
+                return {CONSTANT: True}
             if lhs_const is not None:
                 if not lhs_const:
                     return {CONSTANT: True}  # left is false, so implication is true
