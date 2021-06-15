@@ -1,5 +1,6 @@
 import itertools
 import logging
+import re
 import numpy as np
 import scipy.stats as stats
 from collections import OrderedDict
@@ -75,7 +76,7 @@ class _ConverterBase(object):
             f = tuple(n for n in f if n is not None)
             if len(f) == 1:
                 f = f[0]
-            return str(f).replace('\'', '').replace('"', '')
+            return re.sub(r'\'|"|@', '', str(f))
         return str(f)
 
     def _is_feature(self, name: Tuple) -> bool:

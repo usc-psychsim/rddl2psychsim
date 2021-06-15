@@ -140,7 +140,7 @@ class _ExpressionConverter(_ConverterBase):
             name, params = args
             if params is not None and param_map is not None:
                 # replace param placeholder with value on dict
-                params = tuple([param_map[p] for p in params if p in param_map])
+                params = tuple([param_map[p] if p in param_map else p for p in params])
             else:
                 params = (None,)
             f_name = (name,) + params
