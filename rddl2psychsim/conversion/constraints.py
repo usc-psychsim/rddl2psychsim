@@ -42,7 +42,7 @@ class _ConstraintsConverter(_DynamicsConverter):
 
     def _convert_state_action_constraints(self):
         logging.info('__________________________________________________')
-        for constraint in self.model.domain.constraints:
+        for constraint in self.model.domain.constraints + self.model.domain.preconds:
 
             # check param action legality constraint in the form "forall_p action(p) => constraint" before conversion
             if constraint.etype[0] == 'aggregation' and constraint.etype[1] == 'forall' and \

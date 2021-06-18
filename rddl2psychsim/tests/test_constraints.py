@@ -140,7 +140,7 @@ class TestConstraints(unittest.TestCase):
         legal_acts = conv.world.agents[ag_name].getLegalActions()
         self.assertEqual(len(legal_acts), 0)
 
-    def test_actions_legal(self):
+    def test_actions_legal_constraint(self):
         rddl = '''
                 domain my_test {
                     pvariables { 
@@ -158,6 +158,43 @@ class TestConstraints(unittest.TestCase):
                     };
                     reward = p;
                     state-action-constraints { a1 => q > 1; a2 => q <= 1; }; 
+                }
+                non-fluents my_test_empty { domain = my_test; }
+                instance my_test_inst { domain = my_test; init-state { a1; }; horizon  = 3; }
+                '''
+        conv = Converter(const_as_assert=True)
+        conv.convert_str(rddl)
+        p_ = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p_, 0)
+        conv.world.step()
+        ag_name = next(iter(conv.world.agents.keys()))
+        q = conv.world.getState(WORLD, 'q', unique=True)
+        self.assertEqual(q, 1)
+        a = conv.world.getFeature(actionKey(ag_name), unique=True)
+        a1 = conv.actions[ag_name]['a1']
+        a2 = conv.actions[ag_name]['a2']
+        self.assertEqual(a, a1 if q > 1 else a2)
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p, p_ + 2 if a == a1 else p_ - 2)
+
+    def test_actions_legal_precondition(self):
+        rddl = '''
+                domain my_test {
+                    pvariables { 
+                        p : { state-fluent,  int, default = 0 };
+                        q : { state-fluent,  int, default = 1 };
+                        a1 : { action-fluent, bool, default = false }; 
+                        a2 : { action-fluent, bool, default = false }; 
+                    };
+                    cpfs { p' = if (a1') then
+                                    p + 2
+                                else if (a2') then
+                                    p - 2
+                                else
+                                    100;
+                    };
+                    reward = p;
+                    action-preconditions { a1 => q > 1; a2 => q <= 1; }; 
                 }
                 non-fluents my_test_empty { domain = my_test; }
                 instance my_test_inst { domain = my_test; init-state { a1; }; horizon  = 3; }

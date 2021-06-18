@@ -166,7 +166,7 @@ to achieve the same effect
 
 ## State and Action Constraints
 
-The converter supports state and action constraints as defined in the `state-action-constraints` section. However, *most* are treated as *assertions* rather than something that the converter uses to actively constrain PsychSim dynamics, features, etc. 
+The converter supports state and action constraints as defined in the `state-action-constraints` and `action-preconditions` sections. However, *most* are treated as *assertions* rather than something that the converter uses to actively constrain PsychSim dynamics, features' values, etc. 
 
 Constraints involving constants / non-fluents are verified at conversion time, while other constraints, possibly involving actions, are verified by calling the `verify_constraints()` method of the converter object.
 
@@ -174,7 +174,7 @@ If the converter constructor is invoked with `const_as_assert=True` (default), t
 
 ### Action Legality
 
-One special type of constraints in the `state-action-constraints` allows defining legality conditions for actions:
+One special type of constraints in the `state-action-constraints` or `action-preconditions` sections allows defining legality conditions for actions:
 
 - For non-parameterized actions, this can be achieved through *implication* expressions in the form: `action => legality_expression`. For example, if `act => p <= 1;` is provided in the constraints section, then action `act` will be legal *iff* feature `p` is less than or equal to 1
 - Similarly, for parameterized actions, one can define constraints in the form `forall_{?o: obj}[ action(?o) => legality_expresion ];` 
