@@ -110,9 +110,11 @@ class _ConstraintsConverter(_DynamicsConverter):
 
         return None  # could not find action legality constraint in the expression
 
-    def _get_legality_tree(self, expr: Dict) -> Dict:
+    def _get_legality_tree(self, expr: Dict) -> Dict or bool:
         if not isinstance(expr, dict):
-            return expr
+            assert isinstance(expr, bool), \
+                f'Could not parse RDDL expression, legality tree leaf must be boolean: "{expr}"!'
+            return expr  # hit a leaf, just return the value
 
         # just get the truth value of logical expressions
         op = next(iter(expr.keys()))
@@ -137,7 +139,7 @@ class _ConstraintsConverter(_DynamicsConverter):
 
         # default: assumes linear combination of all features in vector has to be > 0.5,
         # which is truth value in PsychSim (see psychsim.world.World.float2value)
-        if _is_linear_function(expr) or self._is_enum_expr(expr):
+        if _is_linear_function(expr) or self._is_constant_expr(expr):
             return {'if': (expr, 0.5, 1),
                     True: True,
                     False: False}

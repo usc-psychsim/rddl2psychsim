@@ -94,6 +94,9 @@ class _ConverterBase(object):
     def _is_constant(self, name: Tuple) -> bool:
         return self.get_feature_name(name) in self.constants
 
+    def _is_constant_value(self, val: str) -> bool:
+        return val in self.constants.values()
+
     def _get_constant_value(self, name: Tuple) -> object:
         return self.constants[self.get_feature_name(name)]
 
@@ -112,9 +115,9 @@ class _ConverterBase(object):
                 return True
         return False
 
-    def _is_enum_value(self, name: str) -> bool:
+    def _is_enum_value(self, val: str) -> bool:
         for t_name, t_vals in self.model.domain.types:
-            if self._is_enum(t_name) and (name in t_vals or '@' + name in t_vals):
+            if self._is_enum(t_name) and (val in t_vals or '@' + val in t_vals):
                 return True
         return False
 
@@ -135,10 +138,18 @@ class _ConverterBase(object):
         if t_range == 'real':
             return float, 0.
 
-        # checks enumerated / custom types
+        # checks enumerated (domain-level constant) types
         domain = self._get_enum_values(t_range)
         if domain is not None:
             return list, domain
+
+        # checks object (instance-level) types
+        try:
+            domain = self._get_param_values(t_range)
+            if domain is not None:
+                return list, domain
+        except ValueError:
+            pass
 
         raise ValueError(f'Could not get domain for range type: {t_range}!')
 
@@ -258,7 +269,7 @@ class _ConverterBase(object):
 
             # set to default value (if list assume first of list)
             lo = self.world.variables[f]['lo']
-            def_val = fluent.default if fluent.default is not None else \
+            def_val = fluent.default if fluent.default not in {None, 'none', 'null', 'None', 'Null'} else \
                 lo if lo is not None else self.world.variables[f]['elements'][0]
             if isinstance(def_val, str):
                 def_val = def_val.replace('@', '')  # just in case it's an enum value

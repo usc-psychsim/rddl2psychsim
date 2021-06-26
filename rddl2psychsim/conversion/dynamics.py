@@ -169,7 +169,7 @@ class _DynamicsConverter(_ExpressionConverter):
                                      for v, p in expr['distribution']]}
 
         # if all key-value pairs, assume direct linear combination of all features
-        if _is_linear_function(expr) or self._is_enum_expr(expr):
+        if _is_linear_function(expr) or self._is_constant_expr(expr):
             return KeyedMatrix({makeFuture(key): KeyedVector({CONSTANT: 0} if len(expr) == 0 else expr)})
 
         raise NotImplementedError(f'Could not parse RDDL expression, got invalid tree: "{expr}"!')
@@ -280,10 +280,10 @@ class _DynamicsConverter(_ExpressionConverter):
             op = _combine_linear_functions(lhs, _negate_linear_function(rhs))
             return op, 0  # if both sides are planes, returns difference (threshold 0)
 
-        if _is_linear_function(lhs) and self._is_enum_expr(rhs):
+        if _is_linear_function(lhs) and self._is_constant_expr(rhs):
             return lhs, rhs[CONSTANT]  # if comparison with enum, return enum value as threshold
 
-        if self._is_enum_expr(lhs) and _is_linear_function(rhs):
+        if self._is_constant_expr(lhs) and _is_linear_function(rhs):
             return rhs, lhs[CONSTANT]  # if comparison with enum, return enum value as threshold
 
         raise ValueError(f'Cannot parse expression, non-PWL relational operation between {lhs} and {rhs}!')

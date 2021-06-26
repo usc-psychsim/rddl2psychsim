@@ -94,7 +94,7 @@ class _ExpressionConverter(_ConverterBase):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-    def _is_enum_expr(self, expr: Dict) -> bool:
+    def _is_constant_expr(self, expr: Dict) -> bool:
         """
         Checks whether the given expression represents an enumerated (constant) value.
         :param Dict expr: the dictionary representing the expression.
@@ -103,7 +103,8 @@ class _ExpressionConverter(_ConverterBase):
         belongs to the set of known enumerated types for the domain.
         Returns `False` otherwise.
         """
-        return isinstance(expr, dict) and len(expr) == 1 and CONSTANT in expr and self._is_enum_value(expr[CONSTANT])
+        return isinstance(expr, dict) and len(expr) == 1 and CONSTANT in expr and \
+               (self._is_enum_value(expr[CONSTANT]) or self._is_constant_value(expr[CONSTANT]))
 
     def _get_param_mappings(self, expression: Expression) -> List[Dict[str, str]]:
         # get mappings in the form param -> param type value for each param combination
@@ -138,12 +139,30 @@ class _ExpressionConverter(_ConverterBase):
 
         if e_type == 'pvar':
             name, params = args
-            if params is not None and param_map is not None:
-                # replace param placeholder with value on dict
-                params = tuple([param_map[p] if p in param_map else p for p in params])
+            if params is not None:
+                # processes variable's parameters
+                params_ = []
+                for p in params:
+                    if param_map is not None and p in param_map:
+                        params_.append(param_map[p])  # replace param placeholder with value on dict
+                    elif self._is_enum_value(p):
+                        params_.append(p)  # replace with enum value
+                    elif isinstance(p, tuple) and p[0] == 'pvar_expr':
+                        # param is a variable, check type
+                        f_name = p[1]
+                        if self._is_constant(f_name):  # replace with named constant
+                            params_.append(self._get_constant_value(f_name))
+                        elif self._is_feature(f_name):
+                            # TODO parameters can be variables themselves
+                            pass
+                        else:
+                            ValueError(f'Unknown param {p} in RDDL expression "{expression_to_rddl(expression)}"!')
+                    else:
+                        raise ValueError(f'Unknown param {p} in RDDL expression "{expression_to_rddl(expression)}"!')
+                params_ = tuple(params_)
             else:
-                params = (None,)
-            f_name = (name,) + params
+                params_ = (None,)
+            f_name = (name,) + params_
 
             # check if we should get future (current) or old feature value, from dependency list and from name
             future = '\'' in name or (dependencies is not None and name in dependencies)
@@ -166,7 +185,7 @@ class _ExpressionConverter(_ConverterBase):
             if self._is_constant(f_name):  # named constant
                 try:
                     value = self._get_constant_value(f_name)
-                    return {CONSTANT: float(value)}
+                    return {CONSTANT: value}
                 except ValueError as e:
                     logging.info(f'Could not convert value "{f_name}" to float in RDDL expression '
                                  f'"{expression_to_rddl(expression)}"!')
@@ -370,8 +389,8 @@ class _ExpressionConverter(_ConverterBase):
                 return {CONSTANT: True}
 
             # left and right have to be linear funcs
-            assert (_is_linear_function(lhs) or self._is_enum_expr(lhs)) and \
-                   (_is_linear_function(rhs) or self._is_enum_expr(rhs)), \
+            assert (_is_linear_function(lhs) or self._is_constant_expr(lhs)) and \
+                   (_is_linear_function(rhs) or self._is_constant_expr(rhs)), \
                 f'Could not parse relational expression "{expression_to_rddl(expression)}", ' \
                 f'invalid PWL equivalence composition!'
             return {'eq': (lhs, rhs)}  # defer for later processing
@@ -384,8 +403,8 @@ class _ExpressionConverter(_ConverterBase):
                 return {CONSTANT: False}
 
             # left and right have to be linear funcs
-            assert (_is_linear_function(lhs) or self._is_enum_expr(lhs)) and \
-                   (_is_linear_function(rhs) or self._is_enum_expr(rhs)), \
+            assert (_is_linear_function(lhs) or self._is_constant_expr(lhs)) and \
+                   (_is_linear_function(rhs) or self._is_constant_expr(rhs)), \
                 f'Could not parse relational expression "{expression_to_rddl(expression)}", ' \
                 f'invalid PWL equivalence composition!'
             return {'neq': (lhs, rhs)}  # defer for later processing
@@ -398,8 +417,8 @@ class _ExpressionConverter(_ConverterBase):
                 return {CONSTANT: False}
 
             # left and right have to be linear funcs
-            assert (_is_linear_function(lhs) or self._is_enum_expr(lhs)) and \
-                   (_is_linear_function(rhs) or self._is_enum_expr(rhs)), \
+            assert (_is_linear_function(lhs) or self._is_constant_expr(lhs)) and \
+                   (_is_linear_function(rhs) or self._is_constant_expr(rhs)), \
                 f'Could not parse relational expression "{expression_to_rddl(expression)}", ' \
                 f'invalid PWL equivalence composition!'
             return {'gt': (lhs, rhs)}  # defer for later processing
@@ -412,8 +431,8 @@ class _ExpressionConverter(_ConverterBase):
                 return {CONSTANT: False}
 
             # left and right have to be linear funcs
-            assert (_is_linear_function(lhs) or self._is_enum_expr(lhs)) and \
-                   (_is_linear_function(rhs) or self._is_enum_expr(rhs)), \
+            assert (_is_linear_function(lhs) or self._is_constant_expr(lhs)) and \
+                   (_is_linear_function(rhs) or self._is_constant_expr(rhs)), \
                 f'Could not parse relational expression "{expression_to_rddl(expression)}", ' \
                 f'invalid PWL equivalence composition!'
             return {'lt': (lhs, rhs)}  # defer for later processing
@@ -426,8 +445,8 @@ class _ExpressionConverter(_ConverterBase):
                 return {CONSTANT: True}
 
             # left and right have to be linear funcs
-            assert (_is_linear_function(lhs) or self._is_enum_expr(lhs)) and \
-                   (_is_linear_function(rhs) or self._is_enum_expr(rhs)), \
+            assert (_is_linear_function(lhs) or self._is_constant_expr(lhs)) and \
+                   (_is_linear_function(rhs) or self._is_constant_expr(rhs)), \
                 f'Could not parse relational expression "{expression_to_rddl(expression)}", ' \
                 f'invalid PWL equivalence composition!'
             return {'geq': (lhs, rhs)}  # defer for later processing
@@ -440,8 +459,8 @@ class _ExpressionConverter(_ConverterBase):
                 return {CONSTANT: True}
 
             # left and right have to be linear funcs
-            assert (_is_linear_function(lhs) or self._is_enum_expr(lhs)) and \
-                   (_is_linear_function(rhs) or self._is_enum_expr(rhs)), \
+            assert (_is_linear_function(lhs) or self._is_constant_expr(lhs)) and \
+                   (_is_linear_function(rhs) or self._is_constant_expr(rhs)), \
                 f'Could not parse relational expression "{expression_to_rddl(expression)}",' \
                 f'invalid PWL equivalence composition!'
             return {'leq': (lhs, rhs)}  # defer for later processing
@@ -489,7 +508,7 @@ class _ExpressionConverter(_ConverterBase):
                     raise ValueError(f'Cannot parse switch expression: "{expression_to_rddl(expression)}", '
                                      f'unknown case type: "{case_type}"!')
 
-                assert val == 'default' or _is_linear_function(val) or self._is_enum_expr(val), \
+                assert val == 'default' or _is_linear_function(val) or self._is_constant_expr(val), \
                     f'Cannot parse switch expression: "{expression_to_rddl(expression)}", case condition is not PWL!'
                 case_values.append(val)
                 case_branches.append(branch)
