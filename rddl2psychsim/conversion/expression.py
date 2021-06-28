@@ -145,7 +145,7 @@ class _ExpressionConverter(_ConverterBase):
                 for p in params:
                     if param_map is not None and p in param_map:
                         params_.append(param_map[p])  # replace param placeholder with value on dict
-                    elif self._is_enum_value(p):
+                    elif isinstance(p, str) and self._is_enum_value(p):
                         params_.append(p)  # replace with enum value
                     elif isinstance(p, tuple) and p[0] == 'pvar_expr':
                         # param is a variable, check type
@@ -164,12 +164,19 @@ class _ExpressionConverter(_ConverterBase):
                 params_ = (None,)
             f_name = (name,) + params_
 
+            # check if it's a named constant, return it's value
+            if self._is_constant(f_name):
+                value = self._get_constant_value(f_name)
+                return {CONSTANT: value}
+
+            # check if it's a feature
             # check if we should get future (current) or old feature value, from dependency list and from name
             future = '\'' in name or (dependencies is not None and name in dependencies)
             if self._is_feature(f_name):  # check if this variable refers to a known feature
                 f_name = self._get_feature(f_name)
                 return {makeFuture(f_name) if future else f_name: 1.}
 
+            # check if it's an action
             ag_actions = []
             for agent in self.world.agents.values():
                 if self._is_action(f_name, agent):  # check if this variable refers to an agent's action
@@ -181,15 +188,6 @@ class _ExpressionConverter(_ConverterBase):
                 for ag_action in ag_actions[1:]:
                     or_tree = {'logical_or': (or_tree, {'action': ag_action})}
                 return or_tree
-
-            if self._is_constant(f_name):  # named constant
-                try:
-                    value = self._get_constant_value(f_name)
-                    return {CONSTANT: value}
-                except ValueError as e:
-                    logging.info(f'Could not convert value "{f_name}" to float in RDDL expression '
-                                 f'"{expression_to_rddl(expression)}"!')
-                    raise e
 
             raise ValueError(f'Could not find feature, action or constant from RDDL expression '
                              f'"{expression_to_rddl(expression)}"!')

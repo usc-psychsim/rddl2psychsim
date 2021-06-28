@@ -134,55 +134,6 @@ class TestTypes(unittest.TestCase):
         p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, -0.01)
 
-
-    def test_enum_fluent_def(self):
-        rddl = '''
-                domain my_test {
-                    types {
-                        enum_level : {@low, @medium, @high};
-                    };
-                    pvariables { 
-                        p : { state-fluent,  enum_level, default = @high };
-                        a : { action-fluent, bool, default = false }; 
-                    };
-                    cpfs { p' = @medium; }; 
-                    reward = 0;
-                }
-                non-fluents my_test_empty { domain = my_test; }
-                instance my_test_inst { domain = my_test; init-state { a; }; }
-                '''
-        conv = Converter()
-        conv.convert_str(rddl)
-        p = conv.world.getState(WORLD, 'p', unique=True)
-        self.assertEqual(p, 'high')
-        conv.world.step()
-        p = conv.world.getState(WORLD, 'p', unique=True)
-        self.assertEqual(p, 'medium')
-
-    def test_enum_fluent_init(self):
-        rddl = '''
-                domain my_test {
-                    types {
-                        enum_level : {@low, @medium, @high};
-                    };
-                    pvariables { 
-                        p : { state-fluent,  enum_level, default = @high };
-                        a : { action-fluent, bool, default = false }; 
-                    };
-                    cpfs { p' = @medium; }; 
-                    reward = 0;
-                }
-                non-fluents my_test_empty { domain = my_test; }
-                instance my_test_inst { domain = my_test; init-state { p = @low; }; }
-                '''
-        conv = Converter()
-        conv.convert_str(rddl)
-        p = conv.world.getState(WORLD, 'p', unique=True)
-        self.assertEqual(p, 'low')
-        conv.world.step()
-        p = conv.world.getState(WORLD, 'p', unique=True)
-        self.assertEqual(p, 'medium')
-
     def test_interm_fluent(self):
         rddl = '''
                 domain my_test {
@@ -747,6 +698,116 @@ class TestTypes(unittest.TestCase):
             self.assertIn(Converter.get_feature_name(('C', *o)), conv.constants)
             self.assertEqual(conv.constants[Converter.get_feature_name(('C', *o))], v)
 
+    def test_enum_fluent_def(self):
+        rddl = '''
+                domain my_test {
+                    types {
+                        enum_level : {@low, @medium, @high};
+                    };
+                    pvariables { 
+                        p : { state-fluent,  enum_level, default = @high };
+                        a : { action-fluent, bool, default = false }; 
+                    };
+                    cpfs { p' = @medium; }; 
+                    reward = 0;
+                }
+                non-fluents my_test_empty { domain = my_test; }
+                instance my_test_inst { domain = my_test; init-state { a; }; }
+                '''
+        conv = Converter()
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p, 'high')
+        conv.world.step()
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p, 'medium')
+
+    def test_enum_fluent_init(self):
+        rddl = '''
+                domain my_test {
+                    types {
+                        enum_level : {@low, @medium, @high};
+                    };
+                    pvariables { 
+                        p : { state-fluent,  enum_level, default = @high };
+                        a : { action-fluent, bool, default = false }; 
+                    };
+                    cpfs { p' = @medium; }; 
+                    reward = 0;
+                }
+                non-fluents my_test_empty { domain = my_test; }
+                instance my_test_inst { domain = my_test; init-state { p = @low; }; }
+                '''
+        conv = Converter()
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p, 'low')
+        conv.world.step()
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p, 'medium')
+
+    def test_enum_fluent_dyn_const(self):
+        rddl = '''
+                domain my_test {
+                    types {
+                        enum_level : {@low, @medium, @high};
+                    };
+                    pvariables { 
+                        p : { state-fluent, enum_level, default = none };
+                        C : { non-fluent, enum_level, default = @low };
+                        a : { action-fluent, bool, default = false }; 
+                    };
+                    cpfs { p' = C; }; 
+                    reward = 0;
+                }
+                non-fluents my_test_empty { 
+                    domain = my_test;
+                    non-fluents { C=@medium; };
+                }
+                instance my_test_inst { domain = my_test; init-state { p=@low; }; }
+                '''
+        conv = Converter()
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p, 'low')
+        conv.world.step()
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p, 'medium')
+
+    def test_enum_fluent_dyn_const_param(self):
+        rddl = '''
+                domain my_test {
+                    types {
+                        enum_level : {@low, @medium, @high};
+                    };
+                    pvariables { 
+                        p : { state-fluent, enum_level, default = @low };
+                        C : { non-fluent, enum_level, default = @low };
+                        NEXT(enum_level) : { non-fluent, enum_level, default = @low };
+                        a : { action-fluent, bool, default = false }; 
+                    };
+                    cpfs { p' = NEXT(C); }; 
+                    reward = 0;
+                }
+                non-fluents my_test_empty { 
+                    domain = my_test;
+                    non-fluents { 
+                        C=@medium;
+                        NEXT(@low)=@medium;
+                        NEXT(@medium)=@high;
+                        NEXT(@high)=@high; 
+                    };
+                }
+                instance my_test_inst { domain = my_test; init-state { p=@low; }; }
+                '''
+        conv = Converter()
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p, 'low')
+        conv.world.step()
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p, 'high')
+
     def test_object_fluent_def(self):
         rddl = '''
                 domain my_test {
@@ -804,6 +865,41 @@ class TestTypes(unittest.TestCase):
         self.assertEqual(p, 'medium')
 
     def test_object_fluent_dyn_const_param(self):
+        rddl = '''
+                domain my_test {
+                    types {
+                        obj_level: object;
+                    };
+                    pvariables { 
+                        p : { state-fluent, obj_level, default = none };
+                        C : { non-fluent, obj_level, default = none };
+                        NEXT(obj_level) : { non-fluent, obj_level, default = none };
+                        a : { action-fluent, bool, default = false }; 
+                    };
+                    cpfs { p' = NEXT(C); }; 
+                    reward = 0;
+                }
+                non-fluents my_test_empty { 
+                    domain = my_test;
+                    objects { obj_level : {low, medium, high}; };
+                    non-fluents { 
+                        C=medium;
+                        NEXT(low)=medium;
+                        NEXT(medium)=high;
+                        NEXT(high)=high; 
+                    };
+                }
+                instance my_test_inst { domain = my_test; init-state { p=low; }; }
+                '''
+        conv = Converter()
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p, 'low')
+        conv.world.step()
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p, 'high')
+
+    def test_object_fluent_dyn_var_param(self):
         rddl = '''
                 domain my_test {
                     types {

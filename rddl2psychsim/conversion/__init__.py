@@ -129,7 +129,7 @@ class _ConverterBase(object):
                 return [_.replace('@', '') for _ in t_vals]  # strip "@" character from enum values
         return None
 
-    def _get_domain(self, t_range):
+    def _get_domain(self, t_range: str):
         # checks normal types
         if t_range == 'int':
             return int, 0.
@@ -143,7 +143,7 @@ class _ConverterBase(object):
         if domain is not None:
             return list, domain
 
-        # checks object (instance-level) types
+        # checks object (instance-level constant) types
         try:
             domain = self._get_param_values(t_range)
             if domain is not None:
@@ -212,18 +212,23 @@ class _ConverterBase(object):
                 nf_combs = [(nf.name, None)]  # not-parameterized constant
             for nf_name in nf_combs:
                 nf_name = self.get_feature_name(nf_name)
-                self.constants[nf_name] = nf.default
-                logging.info(f'Initialized constant "{nf_name}" with default value "{nf.default}"')
+                def_val = nf.default
+                if isinstance(def_val, str):
+                    def_val = def_val.replace('@', '')  # just in case it's an enum value
+                self.constants[nf_name] = def_val
+                logging.info(f'Initialized constant "{nf_name}" with default value "{def_val}"')
 
         # then set value of non-fluents from initialization definition
         if hasattr(self.model.non_fluents, 'init_non_fluent'):
-            for nf, val in self.model.non_fluents.init_non_fluent:
+            for nf, def_val in self.model.non_fluents.init_non_fluent:
                 nf_name = nf if nf[1] is None else (nf[0], *nf[1])
                 nf_name = self.get_feature_name(nf_name)
                 if nf_name not in self.constants:
                     raise ValueError(f'Trying to initialize non-existing non-fluent: {nf_name}!')
-                self.constants[nf_name] = val
-                logging.info(f'Initialized constant "{nf_name}" to "{val}"')
+                if isinstance(def_val, str):
+                    def_val = def_val.replace('@', '')  # just in case it's an enum value
+                self.constants[nf_name] = def_val
+                logging.info(f'Initialized constant "{nf_name}" in non-fluents to "{def_val}"')
 
         logging.info(f'Total {len(self.constants)} constants initialized')
 
