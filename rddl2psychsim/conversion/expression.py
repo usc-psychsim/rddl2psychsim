@@ -1,5 +1,5 @@
-import logging
 import math
+import itertools as it
 import numpy as np
 from typing import Dict, Union, List, Set
 from pyrddl.expr import Expression
@@ -131,66 +131,14 @@ class _ExpressionConverter(_ConverterBase):
             raise ValueError(f'Could not find enumerated type from RDDL expression "{expression_to_rddl(expression)}"!')
 
         if e_type == 'param':
-            # just check if parameter is known in the current scope
+            # just check if parameter is known in the current scope and return its value
             if args in param_map:
                 return {CONSTANT: param_map[args]}
             raise ValueError(f'Could not find parameter "{args}" in the current scope from '
                              f'RDDL expression "{expression_to_rddl(expression)}"!')
 
         if e_type == 'pvar':
-            name, params = args
-            if params is not None:
-                # processes variable's parameters
-                params_ = []
-                for p in params:
-                    if param_map is not None and p in param_map:
-                        params_.append(param_map[p])  # replace param placeholder with value on dict
-                    elif isinstance(p, str) and self._is_enum_value(p):
-                        params_.append(p)  # replace with enum value
-                    elif isinstance(p, tuple) and p[0] == 'pvar_expr':
-                        # param is a variable, check type
-                        f_name = p[1]
-                        if self._is_constant(f_name):  # replace with named constant
-                            params_.append(self._get_constant_value(f_name))
-                        elif self._is_feature(f_name):
-                            # TODO parameters can be variables themselves
-                            pass
-                        else:
-                            ValueError(f'Unknown param {p} in RDDL expression "{expression_to_rddl(expression)}"!')
-                    else:
-                        raise ValueError(f'Unknown param {p} in RDDL expression "{expression_to_rddl(expression)}"!')
-                params_ = tuple(params_)
-            else:
-                params_ = (None,)
-            f_name = (name,) + params_
-
-            # check if it's a named constant, return it's value
-            if self._is_constant(f_name):
-                value = self._get_constant_value(f_name)
-                return {CONSTANT: value}
-
-            # check if it's a feature
-            # check if we should get future (current) or old feature value, from dependency list and from name
-            future = '\'' in name or (dependencies is not None and name in dependencies)
-            if self._is_feature(f_name):  # check if this variable refers to a known feature
-                f_name = self._get_feature(f_name)
-                return {makeFuture(f_name) if future else f_name: 1.}
-
-            # check if it's an action
-            ag_actions = []
-            for agent in self.world.agents.values():
-                if self._is_action(f_name, agent):  # check if this variable refers to an agent's action
-                    ag_actions.append((agent, self._get_action(f_name, agent), future))
-            if len(ag_actions) > 0:
-                # TODO can do plane disjunction when supported in PsychSim
-                # creates OR nested tree for matching any agents' actions
-                or_tree = {'action': ag_actions[0]}
-                for ag_action in ag_actions[1:]:
-                    or_tree = {'logical_or': (or_tree, {'action': ag_action})}
-                return or_tree
-
-            raise ValueError(f'Could not find feature, action or constant from RDDL expression '
-                             f'"{expression_to_rddl(expression)}"!')
+            return self._convert_variable_expr(expression, param_map, dependencies)
 
         if e_type == 'arithmetic':
             return self._convert_arithmetic_expr(expression, param_map, dependencies)
@@ -213,6 +161,102 @@ class _ExpressionConverter(_ConverterBase):
         # not yet implemented
         raise NotImplementedError(f'Cannot parse expression: "{expression_to_rddl(expression)}", '
                                   f'cannot handle type "{e_type}"!')
+
+    def _convert_variable_expr(self, expression: Expression, param_map: Dict[str, str] = None,
+                               dependencies: Set[str] = None) -> Dict:
+
+        name, params = expression.args
+        if params is not None:
+            # processes variable's parameters
+            param_vals = []
+            feat_idxs = {}  # stores indexes of parameters that are variables
+            for i, p in enumerate(params):
+                if param_map is not None and p in param_map:
+                    param_vals.append([param_map[p]])  # replace param placeholder with value on dict
+                elif isinstance(p, str) and self._is_enum_value(p):
+                    param_vals.append([p.replace('@', '')])  # replace with enum value
+                elif isinstance(p, Expression):
+                    # param is a variable expression, so convert and check its type
+                    p = self._convert_expression(p, param_map, dependencies)
+                    assert len(p) == 1, f'Parameter is not a constant or variable name: "{p}"' \
+                                        f'in RDDL expression "{expression_to_rddl(expression)}"!'
+                    feat_name = next(iter(p.keys()))
+                    if feat_name == CONSTANT:
+                        param_vals.append([p[CONSTANT]])  # if it's a constant, param equals its value
+                    elif self.world.variables[feat_name]['domain'] == list:
+                        # if it's a variable and has finite domain (enum or object), store type values
+                        feat_idxs[feat_name] = i
+                        param_vals.append(self.world.variables[feat_name]['elements'])
+                    else:
+                        ValueError(f'Unknown or infinite domain param {p} '
+                                   f'in RDDL expression "{expression_to_rddl(expression)}"!')
+                else:
+                    raise ValueError(f'Unknown param {p} in RDDL expression "{expression_to_rddl(expression)}"!')
+
+            # get combinations between parameter values
+            param_combs = list(it.product(*param_vals))
+            if len(param_combs) == 1:
+                param_vals = tuple(param_combs[0])  # if only one parameter combination, move on
+            else:
+                # otherwise, create one (possibly nested) switch statement to contemplate all possible param values
+                feat_idxs = sorted([(feat, idx) for feat, idx in feat_idxs.items() if len(param_vals[idx]) > 1],
+                                   key=lambda feat_idx: len(param_vals[feat_idx[1]]))
+                feats_case_vals = {}
+                for param_comb in param_combs:
+                    param_map.update(dict(zip(params, param_comb)))  # update map to replace variables with values
+                    expr = self._convert_expression(expression, param_map, dependencies)
+                    comb_key = tuple(param_comb[idx] for _, idx in feat_idxs)
+                    feats_case_vals[comb_key] = expr  # store value/expression for combination
+
+                def _create_nested_switch(cur_feat_idx, cur_comb):
+                    if cur_feat_idx == len(feat_idxs):
+                        # terminal case, just return value/expression for parameter combination
+                        return feats_case_vals[cur_comb]
+
+                    # otherwise create case-branch for each feature value
+                    feat, idx = feat_idxs[cur_feat_idx]
+                    case_vals = param_vals[idx]
+                    case_branches = []
+                    for feat_val in case_vals:
+                        case_branches.append(_create_nested_switch(cur_feat_idx + 1, cur_comb + (feat_val,)))
+                    case_vals = [{CONSTANT: v} for v in case_vals]
+                    case_vals[-1] = 'default'  # replace last value with "default" case option
+                    cond = {feat: 1}
+                    return {'switch': (cond, case_vals, case_branches)}  # return a switch expression
+
+                return _create_nested_switch(0, ())
+        else:
+            param_vals = (None,)
+        f_name = (name,) + param_vals
+
+        # check if it's a named constant, return it's value
+        if self._is_constant(f_name):
+            value = self._get_constant_value(f_name)
+            return {CONSTANT: value}
+
+        # check if we should get future (current) or old value, from dependency list and from name
+        future = '\'' in name or (dependencies is not None and name in dependencies)
+
+        # check if this variable refers to a known feature, return the feature
+        if self._is_feature(f_name):  #
+            f_name = self._get_feature(f_name)
+            return {makeFuture(f_name) if future else f_name: 1.}
+
+        # check if it's an action
+        ag_actions = []
+        for agent in self.world.agents.values():
+            if self._is_action(f_name, agent):  # check if this variable refers to an agent's action
+                ag_actions.append((agent, self._get_action(f_name, agent), future))
+        if len(ag_actions) > 0:
+            # TODO can do plane disjunction when supported in PsychSim
+            # creates OR nested tree for matching any agents' actions
+            or_tree = {'action': ag_actions[0]}
+            for ag_action in ag_actions[1:]:
+                or_tree = {'logical_or': (or_tree, {'action': ag_action})}
+            return or_tree
+
+        raise ValueError(f'Could not find feature, action or constant from RDDL expression '
+                         f'"{expression_to_rddl(expression)}"!')
 
     def _convert_arithmetic_expr(self, expression: Expression, param_map: Dict[str, str] = None,
                                  dependencies: Set[str] = None) -> Dict:
