@@ -28,14 +28,19 @@ TODO
 
 - `non-fluent`, converted into constants to be used for the definition of dynamics for other variables 
 
+  - <u>Note:</u> no PsychSim features are created for non-fluents, *i.e.*, they are used only *during* conversion to PsychSim 
+
 - ` state-fluent`, `interm-fluent`, and `observ-fluent`, all converted into PsychSim features
+  
   - <u>Note:</u> `observ-fluent` variables are automatically added to agent's `omega` if `partially-observed` is specified in the `requirements` section
   
 - `action-fluent`, converted into PsychSim action
 
   <u>Notes:</u>
 
-  - Supports parameterized (n-arity) predicates by creating state features in PsychSim for *all* combinations of the parameters in the provided instance
+  - Supports parameterized (n-arity) fluents (predicates or functions) by creating state features in PsychSim for *all* combinations of the parameters in the provided instance
+
+  - Parameters can be of a constant type (`enum` or `object`, see below) or fluents (variable or constant) whose type has a finite domain such that they can be enumerated at conversion time
 
   - Fluent stratification level from RDDL file is used to define the following hierarchy among features:
 
@@ -44,14 +49,17 @@ TODO
     3. Intermediate fluents (ordered according to the associated stratification `level` parameter)
     4. Observable fluents
 
-    When creating dynamics' tree for a feature in PsychSim, the future value (current update step) of other features of a *strictly lower* level in the hierarchy is considered, otherwise their past value (previous updated step) is used
+    When creating the dynamics' tree for a feature in PsychSim, the future value (current update step) of other features of a *strictly lower* level in the hierarchy is considered, otherwise their past value (previous updated step) is used
 
-## Constants
+## Fluent Types
 
-- `true`, `false` 
+- boolean: `true` and `false` constants
 - integers
 - reals, converted to python floats
-- enumerated values via the definition in `types`. Note: enums have no boolean or arithmetic evaluation, but can be used as constants in variable attribution and in relational expressions
+- enumerated types via the `enum` definition in the `types` section. These correspond to domain-level constant types
+  - <u>Note:</u> enums have no boolean or arithmetic evaluation, but can be used as constants in variable attribution and in relational expressions
+- object types, via the `object` declaration in the `types` section and further definition in the `non-fluents` section. These correspond to instance-lvel constant types. 
+  - <u>Note:</u> for conversion to PsychSim purposes, objects are treated just like an enumerated type
 
 ## Logical Expressions
 
