@@ -353,3 +353,7 @@ class TestTypes(unittest.TestCase):
         bins = np.array(conv._normal_bins) * np.sqrt(conv._poisson_exp_rate) + mean
         for k, v in zip(bins, conv._normal_probs):
             self.assertEqual(p[k], v)
+
+
+if __name__ == '__main__':
+    unittest.main()

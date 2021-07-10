@@ -1,5 +1,5 @@
 import unittest
-from psychsim.pwl import WORLD
+from psychsim.pwl import WORLD, stateKey
 from rddl2psychsim.conversion.converter import Converter
 
 __author__ = 'Pedro Sequeira'
@@ -81,6 +81,29 @@ class TestBoolean(unittest.TestCase):
                 a : { action-fluent, bool, default = false }; 
             };
             cpfs { p' = 1 ^ 0; };
+            reward = 0;
+        }
+        non-fluents my_test_empty { domain = my_test; }
+        instance my_test_inst { domain = my_test; init-state { a; }; }
+        '''
+        conv = Converter()
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p, True)
+        conv.world.step()
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p, False)
+
+    def test_and_false_rel(self):
+        rddl = '''
+        domain my_test {
+            pvariables { 
+                p : { state-fluent,  bool, default = true };
+                q : { state-fluent,  int, default = 3 };
+                r : { state-fluent,  int, default = 2 };
+                a : { action-fluent, bool, default = false }; 
+            };
+            cpfs { p' = q > 3 ^ r < 3; };
             reward = 0;
         }
         non-fluents my_test_empty { domain = my_test; }
@@ -316,6 +339,29 @@ class TestBoolean(unittest.TestCase):
         p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
 
+    def test_and_true_rel(self):
+        rddl = '''
+        domain my_test {
+            pvariables { 
+                p : { state-fluent,  bool, default = false };
+                q : { state-fluent,  int, default = 3 };
+                r : { state-fluent,  int, default = 2 };
+                a : { action-fluent, bool, default = false }; 
+            };
+            cpfs { p' = q >= 3 ^ r < 3; };
+            reward = 0;
+        }
+        non-fluents my_test_empty { domain = my_test; }
+        instance my_test_inst { domain = my_test; init-state { a; }; }
+        '''
+        conv = Converter()
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p, False)
+        conv.world.step()
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p, True)
+
     def test_or_false(self):
         rddl = '''
         domain my_test {
@@ -389,6 +435,29 @@ class TestBoolean(unittest.TestCase):
                 a : { action-fluent, bool, default = false }; 
             };
             cpfs { p' = 0 | 0; };
+            reward = 0;
+        }
+        non-fluents my_test_empty { domain = my_test; }
+        instance my_test_inst { domain = my_test; init-state { a; }; }
+        '''
+        conv = Converter()
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p, True)
+        conv.world.step()
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p, False)
+
+    def test_or_false_rel(self):
+        rddl = '''
+        domain my_test {
+            pvariables { 
+                p : { state-fluent,  bool, default = true };
+                q : { state-fluent,  int, default = 3 };
+                r : { state-fluent,  int, default = 2 };
+                a : { action-fluent, bool, default = false }; 
+            };
+            cpfs { p' = q > 3 | r < 1; };
             reward = 0;
         }
         non-fluents my_test_empty { domain = my_test; }
@@ -574,6 +643,83 @@ class TestBoolean(unittest.TestCase):
         p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
 
+    def test_or_true_rel(self):
+        rddl = '''
+        domain my_test {
+            pvariables { 
+                p : { state-fluent,  bool, default = false };
+                q : { state-fluent,  int, default = 3 };
+                r : { state-fluent,  int, default = 2 };
+                a : { action-fluent, bool, default = false }; 
+            };
+            cpfs { p' = q > 2 | r <= 1; };
+            reward = 0;
+        }
+        non-fluents my_test_empty { domain = my_test; }
+        instance my_test_inst { domain = my_test; init-state { a; }; }
+        '''
+        conv = Converter()
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p, False)
+        conv.world.step()
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p, True)
+
+    def test_and_or_true_rel(self):
+        rddl = '''
+        domain my_test {
+            pvariables { 
+                p : { state-fluent,  bool, default = false };
+                q : { state-fluent,  int, default = 3 };
+                r : { state-fluent,  int, default = 2 };
+                a : { action-fluent, bool, default = false }; 
+            };
+            cpfs { p' = p | q >= 3 ^ r < 3; };
+            reward = 0;
+        }
+        non-fluents my_test_empty { domain = my_test; }
+        instance my_test_inst { domain = my_test; init-state { a; }; }
+        '''
+        conv = Converter()
+        conv.convert_str(rddl)
+        dyn = conv.world.getDynamics(stateKey(WORLD, 'p'), True)[0]
+        self.assertEqual(len(dyn.branch.planes), 1)
+        self.assertIsNone(dyn.children[True].branch)
+        self.assertEqual(len(dyn.children[False].branch.planes), 2)
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p, False)
+        conv.world.step()
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p, True)
+
+    def test_and_or_false_rel(self):
+        rddl = '''
+        domain my_test {
+            pvariables { 
+                p : { state-fluent,  bool, default = false };
+                q : { state-fluent,  int, default = 3 };
+                r : { state-fluent,  int, default = 2 };
+                a : { action-fluent, bool, default = false }; 
+            };
+            cpfs { p' = (p | q > 3) ^ r < 3; };
+            reward = 0;
+        }
+        non-fluents my_test_empty { domain = my_test; }
+        instance my_test_inst { domain = my_test; init-state { a; }; }
+        '''
+        conv = Converter()
+        conv.convert_str(rddl)
+        dyn = conv.world.getDynamics(stateKey(WORLD, 'p'), True)[0]
+        self.assertEqual(len(dyn.branch.planes), 2)
+        self.assertEqual(len(dyn.children[True].branch.planes), 1)
+        self.assertIsNone(dyn.children[False].branch)
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p, False)
+        conv.world.step()
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p, False)
+
     def test_not_false(self):
         rddl = '''
         domain my_test {
@@ -702,6 +848,33 @@ class TestBoolean(unittest.TestCase):
         self.assertEqual(p, True)
         self.assertEqual(q, False)
 
+    def test_not_and_rel(self):
+        rddl = '''
+        domain my_test {
+            pvariables { 
+                p : { state-fluent,  bool, default = true };
+                q : { state-fluent,  int, default = 1 };
+                r : { state-fluent,  int, default = 3 };
+                a : { action-fluent, bool, default = false }; 
+            };
+            cpfs { p' = ~(q <= 2 ^ r > 2); };
+            reward = 0;
+        }
+        non-fluents my_test_empty { domain = my_test; }
+        instance my_test_inst { domain = my_test; init-state { a; }; }
+        '''
+        conv = Converter()
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p, True)
+        conv.world.step()
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        q = conv.world.getState(WORLD, 'q', unique=True)
+        r = conv.world.getState(WORLD, 'r', unique=True)
+        self.assertEqual(q, 1)
+        self.assertEqual(r, 3)
+        self.assertEqual(p, False)
+
     def test_not_or_true(self):
         rddl = '''
         domain my_test {
@@ -746,6 +919,33 @@ class TestBoolean(unittest.TestCase):
         self.assertEqual(p, False)
         self.assertEqual(q, False)
 
+    def test_not_or_rel(self):
+        rddl = '''
+        domain my_test {
+            pvariables { 
+                p : { state-fluent,  bool, default = false };
+                q : { state-fluent,  int, default = 1 };
+                r : { state-fluent,  int, default = 3 };
+                a : { action-fluent, bool, default = false }; 
+            };
+            cpfs { p' = ~(q < 0 | r > 3); };
+            reward = 0;
+        }
+        non-fluents my_test_empty { domain = my_test; }
+        instance my_test_inst { domain = my_test; init-state { a; }; }
+        '''
+        conv = Converter()
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p, False)
+        conv.world.step()
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        q = conv.world.getState(WORLD, 'q', unique=True)
+        r = conv.world.getState(WORLD, 'r', unique=True)
+        self.assertEqual(q, 1)
+        self.assertEqual(r, 3)
+        self.assertEqual(p, True)
+
     def test_not_not_true(self):
         rddl = '''
         domain my_test {
@@ -766,6 +966,25 @@ class TestBoolean(unittest.TestCase):
         conv.world.step()
         p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
+
+    def test_invalid_not_if(self):
+        rddl = '''
+        domain my_test {
+            pvariables { 
+                p : { state-fluent,  bool, default = false };
+                q : { state-fluent,  int, default = 1 };
+                r : { state-fluent,  int, default = 3 };
+                a : { action-fluent, bool, default = false }; 
+            };
+            cpfs { p' = ~( if (q < 0) then r > 2 else r < 3 ); };
+            reward = 0;
+        }
+        non-fluents my_test_empty { domain = my_test; }
+        instance my_test_inst { domain = my_test; init-state { a; }; }
+        '''
+        conv = Converter()
+        with self.assertRaises(ValueError):
+            conv.convert_str(rddl)
 
     def test_comb_true(self):
         rddl = '''
@@ -1300,6 +1519,30 @@ class TestBoolean(unittest.TestCase):
         self.assertEqual(p, False)
         self.assertEqual(q, 2)
 
+    def test_imply_rel2(self):
+        rddl = '''
+        domain my_test {
+            pvariables { 
+                p : { state-fluent,  bool, default = true };
+                q : { state-fluent,  int, default = 2 };
+                a : { action-fluent, bool, default = false }; 
+            };
+            cpfs { p' = p | (q >= 2) => (q < 0); };
+            reward = 0;
+        }
+        non-fluents my_test_empty { domain = my_test; }
+        instance my_test_inst { domain = my_test; init-state { a; }; }
+        '''
+        conv = Converter()
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p, True)
+        conv.world.step()
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        q = conv.world.getState(WORLD, 'q', unique=True)
+        self.assertEqual(p, False)
+        self.assertEqual(q, 2)
+
     def test_imply_action(self):
         rddl = '''
                 domain my_test {
@@ -1323,6 +1566,30 @@ class TestBoolean(unittest.TestCase):
         conv.world.step()
         p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
+
+    def test_not_imply_action(self):
+        rddl = '''
+                domain my_test {
+                    pvariables { 
+                        p : { state-fluent,  bool, default = false };
+                        q : { state-fluent,  bool, default = true };
+                        a : { action-fluent, bool, default = false }; 
+                    };
+                    cpfs { p' = ~(q => ~ a); };
+                    reward = 0;
+                }
+                non-fluents my_test_empty { domain = my_test; }
+                instance my_test_inst { domain = my_test; init-state { a; }; }
+                '''
+        conv = Converter()
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        q = conv.world.getState(WORLD, 'q', unique=True)
+        self.assertEqual(p, False)
+        self.assertEqual(q, True)
+        conv.world.step()
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p, True)
 
 
 if __name__ == '__main__':

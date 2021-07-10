@@ -1,6 +1,6 @@
 import unittest
 import numpy as np
-from psychsim.pwl import WORLD
+from psychsim.pwl import WORLD, stateKey
 from rddl2psychsim.conversion.converter import Converter
 
 __author__ = 'Pedro Sequeira'
@@ -642,11 +642,85 @@ class TestAggregation(unittest.TestCase):
                 '''
         conv = Converter()
         conv.convert_str(rddl)
+        dyn = conv.world.getDynamics(stateKey(WORLD, 'p'), True)[0]
+        self.assertTrue(dyn.branch.isConjunction)
+        self.assertEqual(len(dyn.branch.planes), len(objs))
         p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
         conv.world.step()
         p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, all(q >= 1 for q in objs.values()))
+
+    def test_fluent_forall_or(self):
+        objs = {'x1': 1, 'x2': 2, 'x3': 3, 'x4': 4}
+        rddl = f'''
+                domain my_test {{
+                    types {{ obj : object; }};
+                    pvariables {{ 
+                        p : {{ state-fluent, bool, default = false }};
+                        q(obj) : {{ state-fluent, int, default = -1 }};
+                        a : {{ action-fluent, bool, default = false }}; 
+                    }};
+                    cpfs {{ p' = forall_{{?x : obj}}[ q(?x) >= 1 | p  ]; }}; 
+                    reward = 0;
+                }}
+                non-fluents my_test_nf {{ 
+                    domain = my_test; 
+                    objects {{
+                        obj : {{{', '.join(objs.keys())}}};
+                    }};
+                }}
+                instance my_test_inst {{ 
+                    domain = my_test; 
+                    init-state {{
+                        {'; '.join(f'q({o})={v}' for o, v in objs.items())}; 
+                    }}; 
+                }}
+                '''
+        conv = Converter()
+        conv.convert_str(rddl)
+        p_ = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p_, False)
+        conv.world.step()
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p, all(q >= 1 or p_ for q in objs.values()))
+
+    def test_fluent_forall_and(self):
+        objs = {'x1': 1, 'x2': 2, 'x3': 3, 'x4': 4}
+        rddl = f'''
+                domain my_test {{
+                    types {{ obj : object; }};
+                    pvariables {{ 
+                        p : {{ state-fluent, bool, default = true }};
+                        q(obj) : {{ state-fluent, int, default = -1 }};
+                        a : {{ action-fluent, bool, default = false }}; 
+                    }};
+                    cpfs {{ p' = forall_{{?x : obj}}[ q(?x) >= 1 ^ p  ]; }}; 
+                    reward = 0;
+                }}
+                non-fluents my_test_nf {{ 
+                    domain = my_test; 
+                    objects {{
+                        obj : {{{', '.join(objs.keys())}}};
+                    }};
+                }}
+                instance my_test_inst {{ 
+                    domain = my_test; 
+                    init-state {{
+                        {'; '.join(f'q({o})={v}' for o, v in objs.items())}; 
+                    }}; 
+                }}
+                '''
+        conv = Converter()
+        conv.convert_str(rddl)
+        dyn = conv.world.getDynamics(stateKey(WORLD, 'p'), True)[0]
+        self.assertTrue(dyn.branch.isConjunction)
+        self.assertEqual(len(dyn.branch.planes), len(objs) * 2)  # forall AND x AND inside forall
+        p_ = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p_, True)
+        conv.world.step()
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p, all(q >= 1 and p_ for q in objs.values()))
 
     def test_invalid_fluent_forall_if(self):
         objs = {'x1': 1, 'x2': 2, 'x3': 3, 'x4': 4}
@@ -658,7 +732,7 @@ class TestAggregation(unittest.TestCase):
                         q(obj) : {{ state-fluent, int, default = -1 }};
                         a : {{ action-fluent, bool, default = false }}; 
                     }};
-                    cpfs {{ p' = forall_{{?x : obj}}[ if (q(?x) > 2) then q(?x) else - q(?x) ]; }}; 
+                    cpfs {{ p' = forall_{{?x : obj}}[ if (q(?x) > 2) then true else false ]; }}; 
                     reward = 0;
                 }}
                 non-fluents my_test_nf {{ 
@@ -910,11 +984,85 @@ class TestAggregation(unittest.TestCase):
                 '''
         conv = Converter()
         conv.convert_str(rddl)
+        dyn = conv.world.getDynamics(stateKey(WORLD, 'p'), True)[0]
+        self.assertFalse(dyn.branch.isConjunction)
+        self.assertEqual(len(dyn.branch.planes), len(objs))
         p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
         conv.world.step()
         p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, any(q > 3 for q in objs.values()))
+
+    def test_fluent_exists_and(self):
+        objs = {'x1': 1, 'x2': 2, 'x3': 3, 'x4': 4}
+        rddl = f'''
+                domain my_test {{
+                    types {{ obj : object; }};
+                    pvariables {{ 
+                        p : {{ state-fluent, bool, default = true }};
+                        q(obj) : {{ state-fluent, int, default = -1 }};
+                        a : {{ action-fluent, bool, default = false }}; 
+                    }};
+                    cpfs {{ p' = exists_{{?x : obj}}[ q(?x) > 3 ^ p  ]; }}; 
+                    reward = 0;
+                }}
+                non-fluents my_test_nf {{ 
+                    domain = my_test; 
+                    objects {{
+                        obj : {{{', '.join(objs.keys())}}};
+                    }};
+                }}
+                instance my_test_inst {{ 
+                    domain = my_test; 
+                    init-state {{
+                        {'; '.join(f'q({o})={v}' for o, v in objs.items())}; 
+                    }}; 
+                }}
+                '''
+        conv = Converter()
+        conv.convert_str(rddl)
+        p_ = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p_, True)
+        conv.world.step()
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p, any(q > 3 and p_ for q in objs.values()))
+
+    def test_fluent_exists_or(self):
+        objs = {'x1': 1, 'x2': 2, 'x3': 3, 'x4': 4}
+        rddl = f'''
+                domain my_test {{
+                    types {{ obj : object; }};
+                    pvariables {{ 
+                        p : {{ state-fluent, bool, default = false }};
+                        q(obj) : {{ state-fluent, int, default = -1 }};
+                        a : {{ action-fluent, bool, default = false }}; 
+                    }};
+                    cpfs {{ p' = exists_{{?x : obj}}[ q(?x) > 3 | p  ]; }}; 
+                    reward = 0;
+                }}
+                non-fluents my_test_nf {{ 
+                    domain = my_test; 
+                    objects {{
+                        obj : {{{', '.join(objs.keys())}}};
+                    }};
+                }}
+                instance my_test_inst {{ 
+                    domain = my_test; 
+                    init-state {{
+                        {'; '.join(f'q({o})={v}' for o, v in objs.items())}; 
+                    }}; 
+                }}
+                '''
+        conv = Converter()
+        conv.convert_str(rddl)
+        dyn = conv.world.getDynamics(stateKey(WORLD, 'p'), True)[0]
+        self.assertFalse(dyn.branch.isConjunction)
+        self.assertEqual(len(dyn.branch.planes), len(objs) * 2)  # exists OR x OR inside exists
+        p_ = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p_, False)
+        conv.world.step()
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p, any(q > 3 or p_ for q in objs.values()))
 
     def test_invalid_fluent_exists_if(self):
         objs = {'x1': 1, 'x2': 2, 'x3': 3, 'x4': 4}
@@ -945,3 +1093,7 @@ class TestAggregation(unittest.TestCase):
         conv = Converter()
         with self.assertRaises(ValueError):
             conv.convert_str(rddl)
+
+
+if __name__ == '__main__':
+    unittest.main()

@@ -374,7 +374,7 @@ class TestTypes(unittest.TestCase):
                 domain my_test {{
                     types {{ 
                         x_obj : object;
-                        y_obj : {{{ ', '.join({y for _, y in objs.keys()}) }}};
+                        y_obj : {{{', '.join({y for _, y in objs.keys()})}}};
                     }};
                     pvariables {{ 
                         p(x_obj, y_obj) : {{ state-fluent,  bool, default = true }};
@@ -491,7 +491,7 @@ class TestTypes(unittest.TestCase):
                 domain my_test {{
                     types {{ 
                         x_obj : object;
-                        y_obj : {{{ ', '.join({y for _, y in objs.keys()}) }}};
+                        y_obj : {{{', '.join({y for _, y in objs.keys()})}}};
                     }};
                     pvariables {{ 
                         p(x_obj, y_obj) : {{ state-fluent,  bool, default = true }};
@@ -1166,3 +1166,7 @@ class TestTypes(unittest.TestCase):
         self.assertEqual(p, 4)
         q = conv.world.getState(WORLD, 'q', unique=True)
         self.assertEqual(q, 3)
+
+
+if __name__ == '__main__':
+    unittest.main()

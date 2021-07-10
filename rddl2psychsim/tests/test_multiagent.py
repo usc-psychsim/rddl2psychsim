@@ -607,3 +607,7 @@ class TestMultiagent(unittest.TestCase):
         conv.world.step()
         q = conv.world.getState(WORLD, 'q', unique=True)
         self.assertEqual(q, len(agents))
+
+
+if __name__ == '__main__':
+    unittest.main()
