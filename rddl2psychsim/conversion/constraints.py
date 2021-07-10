@@ -128,19 +128,20 @@ class _ConstraintsConverter(_DynamicsConverter):
 
         if 'if' in expr and len(expr) == 3:
             # check if no comparison provided, expression's truth value has to be resolved
-            if len(expr['if']) == 1:
+            if isinstance(expr['if'], dict) and len(expr['if']) == 1:
                 return self._get_legality_tree(self._get_pwl_tree(expr['if'], expr[True], expr[False]))
 
+            assert isinstance(expr['if'], KeyedPlane), f'Could not parse RDDL expression, got invalid tree: "{expr}"!'
+
             # build if-then-else tree
-            weights, threshold, comp = expr['if']
-            return {'if': KeyedPlane(KeyedVector(weights), threshold, comp),
+            return {'if': expr['if'],
                     True: self._get_legality_tree(expr[True]),
                     False: self._get_legality_tree(expr[False])}
 
         # default: assumes linear combination of all features in vector has to be > 0.5,
         # which is truth value in PsychSim (see psychsim.world.World.float2value)
         if _is_linear_function(expr) or self._is_constant_expr(expr):
-            return {'if': (expr, 0.5, 1),
+            return {'if': KeyedPlane(KeyedVector(expr), 0.5, 1),
                     True: True,
                     False: False}
 
