@@ -609,7 +609,7 @@ class _ExpressionConverter(_ConverterBase):
                 if v > 0:
                     dist.append(({CONSTANT: k}, v))
 
-            assert np.isclose(np.sum(v for _, v in dist), 1), \
+            assert np.isclose(np.sum([v for _, v in dist]), 1), \
                 f'Cannot parse stochastic expression: "{expression_to_rddl(expression)}", ' \
                 f'probabilities have to sum to 1!'
             return dist[0][0] if len(dist) == 1 else {'distribution': dist}
@@ -720,7 +720,7 @@ class _ExpressionConverter(_ConverterBase):
             if all(_is_linear_function(expr) for expr in sub_exprs):
                 lf = {}
                 for expr in sub_exprs:
-                    lf = _combine_linear_functions(lf, expr)  # sum linear functions # TODO lf if len(lf) == 1 else
+                    lf = _combine_linear_functions(lf, expr)  # sum linear functions
                 return {CONSTANT: False} if len(lf) == 0 else {'linear_and': lf}
 
             # otherwise build AND plane conjunction
@@ -757,7 +757,7 @@ class _ExpressionConverter(_ConverterBase):
             if all(_is_linear_function(expr) for expr in sub_exprs):
                 lf = {}
                 for expr in sub_exprs:
-                    lf = _combine_linear_functions(lf, expr)  # sum linear functions # TODO lf if len(lf) == 1 else
+                    lf = _combine_linear_functions(lf, expr)  # sum linear functions
                 return {CONSTANT: False} if len(lf) == 0 else {'linear_or': lf}
 
             # otherwise build nested OR plane disjunction
