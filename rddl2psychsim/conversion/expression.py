@@ -21,7 +21,7 @@ def _is_linear_function(expr: Dict) -> bool:
     """
     return isinstance(expr, dict) and \
            all(isinstance(k, str) for k in expr.keys()) and \
-           all(any(map(lambda t: isinstance(v, t), [float, int, bool])) for v in expr.values())
+           all(type(v) in [float, int, bool] for v in expr.values())
 
 
 def _combine_linear_functions(expr1: Dict, expr2: Dict) -> Dict:
@@ -81,9 +81,9 @@ def _get_const_val(expr: Dict, c_type: type = None) -> Union[float, None]:
         if not isinstance(expr, dict):
             return None
         if len(expr) == 1 and CONSTANT in expr:
-            if c_type is not None:
-                return c_type(expr[CONSTANT])
-            return expr[CONSTANT]
+            return c_type(expr[CONSTANT]) if c_type is not None else expr[CONSTANT]
+        if len(expr) == 1 and next(iter(expr.values())) == 0:
+            return c_type(0) if c_type is not None else 0
         return None
     except ValueError:
         return None
@@ -720,14 +720,11 @@ class _ExpressionConverter(_ConverterBase):
             if all(_is_linear_function(expr) for expr in sub_exprs):
                 lf = {}
                 for expr in sub_exprs:
-                    lf = _combine_linear_functions(lf, expr)  # sum linear functions
-                return {CONSTANT: False} if len(lf) == 0 else lf if len(lf) == 1 else {'linear_and': lf}
+                    lf = _combine_linear_functions(lf, expr)  # sum linear functions # TODO lf if len(lf) == 1 else
+                return {CONSTANT: False} if len(lf) == 0 else {'linear_and': lf}
 
-            # otherwise build nested AND tree # TODO can do plane conjunction when supported in PsychSim
-            lf = sub_exprs[0]
-            for expr in sub_exprs[1:]:
-                lf = {'logic_and': (lf, expr)}  # AND tree
-            return lf
+            # otherwise build AND plane conjunction
+            return {'logic_and': sub_exprs}
 
         if d_type == 'exists':
             assert all(len(arg) == 2 and arg[0] == 'typed_var' for arg in expression.args[:-1]), \
@@ -760,14 +757,11 @@ class _ExpressionConverter(_ConverterBase):
             if all(_is_linear_function(expr) for expr in sub_exprs):
                 lf = {}
                 for expr in sub_exprs:
-                    lf = _combine_linear_functions(lf, expr)  # sum linear functions
-                return {CONSTANT: False} if len(lf) == 0 else lf if len(lf) == 1 else {'linear_or': lf}
+                    lf = _combine_linear_functions(lf, expr)  # sum linear functions # TODO lf if len(lf) == 1 else
+                return {CONSTANT: False} if len(lf) == 0 else {'linear_or': lf}
 
-            # otherwise build nested OR tree # TODO can do plane disjunction when supported in PsychSim
-            lf = sub_exprs[0]
-            for expr in sub_exprs[1:]:
-                lf = {'logic_or': (lf, expr)}  # AND tree
-            return lf
+            # otherwise build nested OR plane disjunction
+            return {'logic_or': sub_exprs}
 
         raise NotImplementedError(f'Cannot parse aggregation expression: "{expression_to_rddl(expression)}",'
                                   f'cannot handle type "{d_type}"!')
