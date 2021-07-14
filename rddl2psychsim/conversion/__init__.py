@@ -212,7 +212,8 @@ class _ConverterBase(object):
                 nf_combs = [(nf.name, None)]  # not-parameterized constant
             for nf_name in nf_combs:
                 nf_name = self.get_feature_name(nf_name)
-                def_val = nf.default
+                def_val = nf.default if nf.default not in {None, 'none', 'null', 'None', 'Null'} else \
+                    self._get_domain(nf.range)[1][0]
                 if isinstance(def_val, str):
                     def_val = def_val.replace('@', '')  # just in case it's an enum value
                 self.constants[nf_name] = def_val
@@ -225,6 +226,8 @@ class _ConverterBase(object):
                 nf_name = self.get_feature_name(nf_name)
                 if nf_name not in self.constants:
                     raise ValueError(f'Trying to initialize non-existing non-fluent: {nf_name}!')
+                def_val = def_val if def_val not in {None, 'none', 'null', 'None', 'Null'} else \
+                    self._get_domain(nf.range)[1][0]
                 if isinstance(def_val, str):
                     def_val = def_val.replace('@', '')  # just in case it's an enum value
                 self.constants[nf_name] = def_val

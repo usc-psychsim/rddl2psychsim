@@ -83,7 +83,7 @@ class _ConstraintsConverter(_DynamicsConverter):
 
         # otherwise store dynamics tree for a (external) boolean variable, for later online assertion
         tree = makeTree(self._get_dynamics_tree(
-            _ASSERTION_KEY, self._get_pwl_tree(expr, {CONSTANT: True}, {CONSTANT: False})))
+            _ASSERTION_KEY, self._get_pwl_tree(expr, {True: {CONSTANT: True}, False: {CONSTANT: False}})))
         tree = tree.desymbolize(self.world.symbols)
         self._constraint_trees[tree] = constraint
         logging.info(f'Added dynamic state constraint:\n{tree}')
@@ -94,7 +94,7 @@ class _ConstraintsConverter(_DynamicsConverter):
             agent = expr['imply'][0]['action'][0]
             action = expr['imply'][0]['action'][1]
             # get condition expression as 'if' legality tree
-            legal_tree = self._get_legality_tree(self._get_pwl_tree(expr['imply'][1], True, False))
+            legal_tree = self._get_legality_tree(self._get_pwl_tree(expr['imply'][1], {True: True, False: False}))
             legal_tree = makeTree(legal_tree)
             return agent, action, legal_tree.desymbolize(self.world.symbols)
 
@@ -124,12 +124,14 @@ class _ConstraintsConverter(_DynamicsConverter):
                  'action'}:
             if _get_const_val(expr[op]) is not None:
                 return self._get_legality_tree(expr[op])  # no need for tree if it's a constant value
-            return self._get_legality_tree(self._get_pwl_tree(expr, {CONSTANT: True}, {CONSTANT: False}))
+            return self._get_legality_tree(self._get_pwl_tree(
+                expr, {True: {CONSTANT: True}, False: {CONSTANT: False}}))
 
         if 'if' in expr and len(expr) == 3:
             # check if no comparison provided, expression's truth value has to be resolved
             if isinstance(expr['if'], dict) and len(expr['if']) == 1:
-                return self._get_legality_tree(self._get_pwl_tree(expr['if'], expr[True], expr[False]))
+                return self._get_legality_tree(self._get_pwl_tree(
+                    expr['if'], {True: expr[True], False: expr[False]}))
 
             assert isinstance(expr['if'], KeyedPlane), f'Could not parse RDDL expression, got invalid tree: "{expr}"!'
 
@@ -137,6 +139,8 @@ class _ConstraintsConverter(_DynamicsConverter):
             return {'if': expr['if'],
                     True: self._get_legality_tree(expr[True]),
                     False: self._get_legality_tree(expr[False])}
+
+        # TODO switch here?
 
         # default: assumes linear combination of all features in vector has to be > 0.5,
         # which is truth value in PsychSim (see psychsim.world.World.float2value)

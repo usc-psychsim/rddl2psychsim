@@ -390,12 +390,12 @@ class TestRelational(unittest.TestCase):
         rddl = '''
         domain my_test {
             pvariables { 
-                p : { state-fluent,  bool, default = false };
+                p : { state-fluent,  bool, default = true };
                 q : { state-fluent,  int, default = 1 };
                 r : { state-fluent,  real, default = 1.0 };
                 a : { action-fluent, bool, default = false }; 
             };
-            cpfs { p' = q == r; };
+            cpfs { p' = q ~= r; };
             reward = 0;
         }
         non-fluents my_test_empty { domain = my_test; }
@@ -404,10 +404,10 @@ class TestRelational(unittest.TestCase):
         conv = Converter()
         conv.convert_str(rddl)
         p = conv.world.getState(WORLD, 'p', unique=True)
-        self.assertEqual(p, False)
+        self.assertEqual(p, True)
         conv.world.step()
         p = conv.world.getState(WORLD, 'p', unique=True)
-        self.assertEqual(p, True)
+        self.assertEqual(p, False)
 
     def test_neq_true_const(self):
         rddl = '''

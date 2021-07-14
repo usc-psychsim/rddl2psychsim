@@ -108,12 +108,14 @@ class _DynamicsConverter(_ExpressionConverter):
                  'action'}:
             if _get_const_val(expr[op]) is not None:
                 return self._get_dynamics_tree(key, expr[op])  # no need for tree if it's a constant value
-            return self._get_dynamics_tree(key, self._get_pwl_tree(expr, {CONSTANT: True}, {CONSTANT: False}))
+            return self._get_dynamics_tree(key, self._get_pwl_tree(
+                expr, {True: {CONSTANT: True}, False: {CONSTANT: False}}))
 
         if 'if' in expr and len(expr) == 3:
             # check if no comparison provided, expression's truth value has to be resolved
             if isinstance(expr['if'], dict) and len(expr['if']) == 1:
-                return self._get_dynamics_tree(key, self._get_pwl_tree(expr['if'], expr[True], expr[False]))
+                return self._get_dynamics_tree(key, self._get_pwl_tree(
+                    expr['if'], {True: expr[True], False: expr[False]}))
 
             assert isinstance(expr['if'], KeyedPlane), f'Could not parse RDDL expression, got invalid tree: "{expr}"!'
 
@@ -180,53 +182,63 @@ class _DynamicsConverter(_ExpressionConverter):
 
         raise NotImplementedError(f'Could not parse RDDL expression, got invalid tree: "{expr}"!')
 
-    def _get_pwl_tree(self, expr: Dict, true_branch, false_branch) -> Dict:
+    def _get_pwl_tree(self, branch: Dict, children: Dict) -> Dict:
+
+        def _test_boolean_tree():
+            assert len(children) == 2 and True in children and False in children, \
+                f'Could not parse RDDL expression, boolean tree needs True and False children: {children}'
+
         # first tries to get plane directly from expression
-        plane = self._get_plane(expr)
+        plane = self._get_plane(branch)
         if plane is not None:
-            # if we have a valid plane, then simply return tree
-            return {'if': plane,
-                    True: true_branch,
-                    False: false_branch}
+            # if we have a valid plane, then simply return if tree
+            return {'if': plane, **children}
 
         # otherwise we have to build (possibly nested) PWL trees
-        if 'logic_and' in expr and len(expr) == 1:
-            sub_exprs = expr['logic_and']
-            assert len(sub_exprs) > 1, f'Could not parse RDDL expression, AND needs at least two arguments "{expr}"!'
+        if 'logic_and' in branch and len(branch) == 1:
+            sub_exprs = branch['logic_and']
+            assert len(sub_exprs) > 1, f'Could not parse RDDL expression, AND needs at least two arguments "{branch}"!'
             lhs = sub_exprs[0]
             rhs = {'logic_and': sub_exprs[1:]} if len(sub_exprs) > 2 else sub_exprs[1]
+            _test_boolean_tree()
             return self._get_pwl_tree(lhs,
-                                      self._get_pwl_tree(rhs, true_branch, false_branch),
-                                      false_branch)
+                                      {True: self._get_pwl_tree(rhs, children),
+                                       False: children[False]})
 
-        if 'logic_or' in expr and len(expr) == 1:
-            sub_exprs = expr['logic_or']
-            assert len(sub_exprs) > 1, f'Could not parse RDDL expression, OR needs at least two arguments "{expr}"!'
+        if 'logic_or' in branch and len(branch) == 1:
+            sub_exprs = branch['logic_or']
+            assert len(sub_exprs) > 1, f'Could not parse RDDL expression, OR needs at least two arguments "{branch}"!'
             lhs = sub_exprs[0]
             rhs = {'logic_or': sub_exprs[1:]} if len(sub_exprs) > 2 else sub_exprs[1]
+            _test_boolean_tree()
             return self._get_pwl_tree(lhs,
-                                      true_branch,
-                                      self._get_pwl_tree(rhs, true_branch, false_branch))
+                                      {True: children[True],
+                                       False: self._get_pwl_tree(rhs, children)})
 
-        if 'not' in expr and len(expr) == 1:
-            # if NOT, just flip branches
-            return self._get_pwl_tree(expr['not'], false_branch, true_branch)
+        if 'not' in branch and len(branch) == 1:
+            # if NOT, just swap branches
+            _test_boolean_tree()
+            return self._get_pwl_tree(branch['not'], {True: children[False], False: children[True]})
 
-        if 'equiv' in expr:
+        if 'equiv' in branch:
             # if logical EQUIVALENCE, true iff both sides are true or both are false
-            lhs, rhs = expr['equiv']
+            lhs, rhs = branch['equiv']
+            _test_boolean_tree()
             return self._get_pwl_tree(lhs,
-                                      self._get_pwl_tree(rhs, true_branch, false_branch),
-                                      self._get_pwl_tree(rhs, false_branch, true_branch))
+                                      {True: self._get_pwl_tree(rhs, children),
+                                       False: self._get_pwl_tree(rhs, {True: children[False], False: children[True]})})
 
-        if 'imply' in expr:
+        if 'imply' in branch:
             # if IMPLICATION, false only if left is true and right is false
-            lhs, rhs = expr['imply']
+            lhs, rhs = branch['imply']
+            _test_boolean_tree()
             return self._get_pwl_tree(lhs,
-                                      self._get_pwl_tree(rhs, true_branch, false_branch),
-                                      true_branch)
+                                      {True: self._get_pwl_tree(rhs, children),
+                                       False: children[True]})
 
-        raise ValueError(f'Could not parse RDDL expression, unknown PWL tree comparison "{expr}"!')
+        # TODO switch expression? (replace case values (true/false) with branches??)
+
+        raise ValueError(f'Could not parse RDDL expression, unknown PWL tree comparison "{branch}"!')
 
     def _get_plane(self, expr: Dict, negate: bool = False) -> KeyedPlane or None:
         # KeyedPlane(KeyedVector(weights), threshold, comparison)
