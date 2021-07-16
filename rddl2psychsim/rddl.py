@@ -7,6 +7,13 @@ __email__ = 'pedrodbs@gmail.com'
 
 
 def parse_rddl_file(rddl_file: str, verbose: bool) -> RDDL:
+    """
+    Parses an RDDL file into a python object.
+    :param str rddl_file: the path to the RDDL file to be parsed.
+    :param bool verbose: whether to print parse messages to the screen.
+    :rtype: RDDL
+    :return: the pyrddl python object created by parsing the given RDDL file.
+    """
     # read RDDL file
     with open(rddl_file, 'r') as file:
         rddl = file.read()
@@ -15,15 +22,18 @@ def parse_rddl_file(rddl_file: str, verbose: bool) -> RDDL:
 
 
 def parse_rddl(rddl: str, verbose: bool) -> RDDL:
+    """
+    Parses an RDDL string definition into a python object.
+    :param str rddl: the RDDL definition.
+    :param bool verbose: whether to print parse messages to the screen.
+    :rtype: RDDL
+    :return: the pyrddl python object created by parsing the given RDDL definition.
+    """
     # parse RDDL
     rddl_parser = RDDLParser(verbose=verbose)
     # rddl_parser.debugging = verbose
     rddl_parser.build()
     return rddl_parser.parse(rddl)
-
-
-def _add_parens(expr: str) -> str:
-    return expr if expr.startswith('(') and expr.endswith(')') else f'({expr})'
 
 
 def expression_to_rddl(expr: Expression, level: int = 0, indent_width: int = 4) -> str:
@@ -35,6 +45,10 @@ def expression_to_rddl(expr: Expression, level: int = 0, indent_width: int = 4) 
     :rtype: str
     :return: a string corresponding to the RDDL expression.
     """
+
+    def _add_parens(expr_: str) -> str:
+        return expr_ if expr_.startswith('(') and expr_.endswith(')') else f'({expr_})'
+    
     indent = ' ' * level * indent_width
     if isinstance(expr, str):
         return indent + expr
