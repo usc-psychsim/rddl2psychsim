@@ -54,7 +54,7 @@ class _ConstraintsConverter(_DynamicsConverter):
                 # otherwise process normal constraint expression
                 self._convert_state_action_constraint(constraint)
 
-        logging.info(f'Total {len(self._constraint_trees)} constraints created')
+        logging.info(f'Total {len(self._constraint_trees)} dynamic state constraints created')
 
     def _convert_state_action_constraint(self, constraint: Expression, param_map: Dict[str, str] = None):
         expr = self._convert_expression(constraint, param_map)
@@ -77,15 +77,15 @@ class _ConstraintsConverter(_DynamicsConverter):
             return
         if legality_const is not None:
             agent, action, legal_tree = legality_const
-            agent.legal[action] = legal_tree
+            agent.legal[action] = legal_tree.desymbolize(self.world.symbols)
             logging.info(f'Set legality constraint for action "{action}" to:\n{legal_tree}')
             return
 
         # otherwise store dynamics tree for a (external) boolean variable, for later online assertion
         tree = self._get_dynamics_tree(
             _ASSERTION_KEY, self._get_if_tree(expr, {True: {CONSTANT: True}, False: {CONSTANT: False}}))
-        tree = tree.desymbolize(self.world.symbols)
-        self._constraint_trees[tree] = constraint
+        legal_tree = tree.desymbolize(self.world.symbols)
+        self._constraint_trees[legal_tree] = constraint
         logging.info(f'Added dynamic state constraint:\n{tree}')
 
     def _get_action_legality(self, expr: Dict) -> Union[Tuple[Agent, ActionSet, KeyedTree], None, bool]:
@@ -96,7 +96,7 @@ class _ConstraintsConverter(_DynamicsConverter):
             # get condition expression as 'if' legality tree
             legal_tree = self._get_legality_tree(self._get_if_tree(
                 expr['imply'][1], {True: {CONSTANT: True}, False: {CONSTANT: False}}))
-            return agent, action, legal_tree.desymbolize(self.world.symbols)
+            return agent, action, legal_tree
 
         if 'action' in expr or _get_const_val(expr, bool):
             # if constraint is true or only depends on action, then no need to set legality (always legal)
