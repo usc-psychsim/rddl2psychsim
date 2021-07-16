@@ -1,11 +1,11 @@
 import logging
 import numpy as np
 from functools import reduce
-from typing import Dict, Tuple, Set
+from typing import Dict, Tuple, Set, Callable, List
 from pyrddl.expr import Expression
 from psychsim.action import ActionSet
 from psychsim.pwl import KeyedVector, rewardKey, makeTree, makeFuture, KeyedMatrix, KeyedPlane, CONSTANT, \
-    noChangeMatrix, actionKey
+    actionKey, KeyedTree
 from rddl2psychsim.conversion.expression import _ExpressionConverter, _is_linear_function, _combine_linear_functions, \
     _negate_linear_function, _get_const_val
 
@@ -60,7 +60,7 @@ class _DynamicsConverter(_ExpressionConverter):
         logging.info('__________________________________________________')
         for agent in self.world.agents.values():
             expr = self._convert_expression(self.model.domain.reward, dependencies=set())
-            tree = makeTree(self._get_dynamics_tree(rewardKey(agent.name), expr))
+            tree = self._get_dynamics_tree(rewardKey(agent.name), expr)
             agent.setReward(tree, 1.)
             logging.info(f'Set agent "{agent.name}" reward to:\n{tree}')
 
@@ -73,7 +73,7 @@ class _DynamicsConverter(_ExpressionConverter):
 
         # for each sub-expression, set dynamics for feature as provided by an action (or the world itself)
         for action, dyn_expr in action_dynamics.items():
-            tree = makeTree(self._get_dynamics_tree(key, dyn_expr))
+            tree = self._get_dynamics_tree(key, dyn_expr)
             self.world.setDynamics(key, action, tree)
             logging.info(f'Set dynamics for feature "{key}" associated with "{action}" to:\n{tree}')
 
@@ -98,93 +98,58 @@ class _DynamicsConverter(_ExpressionConverter):
         else:
             return {True: expression}  # otherwise assign dynamics to world
 
-    def _get_dynamics_tree(self, key: str, expr: Dict) -> KeyedMatrix or Dict:
+    def _get_dynamics_tree(self, key: str, expr: Dict) -> KeyedTree:
 
-        # just get the truth value of logical expressions
+        def _leaf_func(leaf_expr: Dict) -> KeyedMatrix:
+            if _is_linear_function(leaf_expr) or self._is_constant_expr(leaf_expr):
+                return KeyedMatrix({makeFuture(key): KeyedVector({CONSTANT: 0} if len(leaf_expr) == 0 else leaf_expr)})
+            raise NotImplementedError(f'Could not parse RDDL expression, got invalid subtree: "{leaf_expr}"!')
+
+        # return a dynamics decision tree from the expression
+        return self._get_decision_tree(expr, _leaf_func)
+
+    def _get_decision_tree(self, expr: Dict, leaf_func: Callable[[Dict], Dict or KeyedMatrix]) -> KeyedTree:
+
+        # check if root operation is a logical expression
         op = next(iter(expr.keys()))
         if len(expr) == 1 and op in \
                 {'linear_and', 'logic_and', 'linear_or', 'logic_or', 'not', 'equiv', 'imply',
                  'eq', 'neq', 'gt', 'lt', 'geq', 'leq',
                  'action'}:
             if _get_const_val(expr[op]) is not None:
-                return self._get_dynamics_tree(key, expr[op])  # no need for tree if it's a constant value
-            return self._get_dynamics_tree(key, self._get_pwl_tree(
-                expr, {True: {CONSTANT: True}, False: {CONSTANT: False}}))
+                # no need for tree if it's a constant value
+                return self._get_decision_tree(expr[op], leaf_func)
 
-        if 'if' in expr and len(expr) == 3:
-            # check if no comparison provided, expression's truth value has to be resolved
+            # otherwise return a tree that gets the truth value of the expression
+            return self._get_decision_tree(self._get_if_tree(
+                expr, {True: {CONSTANT: True}, False: {CONSTANT: False}}), leaf_func)
+
+        if 'if' in expr and len(expr) > 1:
+            # check if no plane (branch) provided, then expression's truth value has to be resolved
             if isinstance(expr['if'], dict) and len(expr['if']) == 1:
-                return self._get_dynamics_tree(key, self._get_pwl_tree(
-                    expr['if'], {True: expr[True], False: expr[False]}))
+                return self._get_decision_tree(self._get_if_tree(
+                    expr['if'], {child: expr[child] for child in expr if child != 'if'}), leaf_func)
 
-            assert isinstance(expr['if'], KeyedPlane), f'Could not parse RDDL expression, got invalid tree: "{expr}"!'
+            assert isinstance(expr['if'], KeyedPlane), f'Could not parse RDDL expression, got invalid branch: "{expr}"!'
 
-            # build if-then-else tree
-            return {'if': expr['if'],
-                    True: self._get_dynamics_tree(key, expr[True]),
-                    False: self._get_dynamics_tree(key, expr[False])}
+            # otherwise just create a PsychSim decision tree
+            tree = {child: self._get_decision_tree(expr[child], leaf_func) for child in expr if child != 'if'}
+            tree['if'] = expr['if']
+            return makeTree(tree)
 
         if 'switch' in expr and len(expr) == 1:
-            cond, case_values, case_branches = expr['switch']
-
-            # separates conditions and branches for constants and other conditional values
-            const_values, const_branches = [], []
-            if_values, if_branches = [], []
-            def_branch = noChangeMatrix(key)  # default is don't change key
-            for i, val in enumerate(case_values):
-                const = val[CONSTANT] if len(val) == 1 and CONSTANT in val else None
-                branch = case_branches[i]
-                if val == 'default':
-                    def_branch = self._get_dynamics_tree(key, branch)
-                elif const is None:
-                    if_values.append(val)
-                    if_branches.append(branch)
-                else:
-                    const_values.append(const)
-                    const_branches.append(branch)
-
-            # first get nested if tree (if needed)
-            root = tree = {}
-            for i, val in enumerate(if_values):
-                if False in tree:
-                    tree = tree[False]  # nest if
-                c = _combine_linear_functions(cond, _negate_linear_function(val))  # gets difference between planes
-                tree['if'] = KeyedPlane(KeyedVector(c), 0, 0)  # tests equality
-                tree[True] = self._get_dynamics_tree(key, if_branches[i])
-                tree[False] = {}
-
-            # if no cases for constant conditionals, return if tree
-            if len(const_branches) == 0:
-                if False in tree:
-                    tree[False] = def_branch
-                else:
-                    root = def_branch
-                return root
-
-            if False in tree:
-                tree = tree[False]  # nest if
-
-            # then get switch-case tree (if needed)
-            tree['if'] = KeyedPlane(KeyedVector(cond), const_values, 0)  # compares equality against const values
-            for i, branch in enumerate(const_branches):
-                tree[i] = self._get_dynamics_tree(key, branch)
-            tree[None] = def_branch
-            return root
+            return self._get_decision_tree(self._get_switch_tree(*expr['switch']), leaf_func)
 
         if 'distribution' in expr and len(expr) == 1:
-            # create stochastic effect
-            return {'distribution': [(KeyedMatrix({makeFuture(key): KeyedVector(v)}), p)
-                                     for v, p in expr['distribution']]}
+            # create stochastic tree
+            return makeTree({'distribution': [(leaf_func(v), p) for v, p in expr['distribution']]})
 
-        # if all key-value pairs, assume direct linear combination of all features
-        if _is_linear_function(expr) or self._is_constant_expr(expr):
-            return KeyedMatrix({makeFuture(key): KeyedVector({CONSTANT: 0} if len(expr) == 0 else expr)})
+        # just return expression's value
+        return makeTree(leaf_func(expr))
 
-        raise NotImplementedError(f'Could not parse RDDL expression, got invalid tree: "{expr}"!')
+    def _get_if_tree(self, branch: Dict, children: Dict) -> Dict:
 
-    def _get_pwl_tree(self, branch: Dict, children: Dict) -> Dict:
-
-        def _test_boolean_tree():
+        def _assert_boolean_tree():
             assert len(children) == 2 and True in children and False in children, \
                 f'Could not parse RDDL expression, boolean tree needs True and False children: {children}'
 
@@ -200,45 +165,92 @@ class _DynamicsConverter(_ExpressionConverter):
             assert len(sub_exprs) > 1, f'Could not parse RDDL expression, AND needs at least two arguments "{branch}"!'
             lhs = sub_exprs[0]
             rhs = {'logic_and': sub_exprs[1:]} if len(sub_exprs) > 2 else sub_exprs[1]
-            _test_boolean_tree()
-            return self._get_pwl_tree(lhs,
-                                      {True: self._get_pwl_tree(rhs, children),
-                                       False: children[False]})
+            _assert_boolean_tree()
+            return self._get_if_tree(lhs,
+                                     {True: self._get_if_tree(rhs, children),
+                                      False: children[False]})
 
         if 'logic_or' in branch and len(branch) == 1:
             sub_exprs = branch['logic_or']
             assert len(sub_exprs) > 1, f'Could not parse RDDL expression, OR needs at least two arguments "{branch}"!'
             lhs = sub_exprs[0]
             rhs = {'logic_or': sub_exprs[1:]} if len(sub_exprs) > 2 else sub_exprs[1]
-            _test_boolean_tree()
-            return self._get_pwl_tree(lhs,
-                                      {True: children[True],
-                                       False: self._get_pwl_tree(rhs, children)})
+            _assert_boolean_tree()
+            return self._get_if_tree(lhs,
+                                     {True: children[True],
+                                      False: self._get_if_tree(rhs, children)})
 
         if 'not' in branch and len(branch) == 1:
             # if NOT, just swap branches
-            _test_boolean_tree()
-            return self._get_pwl_tree(branch['not'], {True: children[False], False: children[True]})
+            _assert_boolean_tree()
+            return self._get_if_tree(branch['not'], {True: children[False], False: children[True]})
 
         if 'equiv' in branch:
             # if logical EQUIVALENCE, true iff both sides are true or both are false
             lhs, rhs = branch['equiv']
-            _test_boolean_tree()
-            return self._get_pwl_tree(lhs,
-                                      {True: self._get_pwl_tree(rhs, children),
-                                       False: self._get_pwl_tree(rhs, {True: children[False], False: children[True]})})
+            _assert_boolean_tree()
+            return self._get_if_tree(lhs,
+                                     {True: self._get_if_tree(rhs, children),
+                                      False: self._get_if_tree(rhs, {True: children[False], False: children[True]})})
 
         if 'imply' in branch:
             # if IMPLICATION, false only if left is true and right is false
             lhs, rhs = branch['imply']
-            _test_boolean_tree()
-            return self._get_pwl_tree(lhs,
-                                      {True: self._get_pwl_tree(rhs, children),
-                                       False: children[True]})
+            _assert_boolean_tree()
+            return self._get_if_tree(lhs,
+                                     {True: self._get_if_tree(rhs, children),
+                                      False: children[True]})
 
         # TODO switch expression? (replace case values (true/false) with branches??)
 
         raise ValueError(f'Could not parse RDDL expression, unknown PWL tree comparison "{branch}"!')
+
+    def _get_switch_tree(self, branch: Dict, case_values: List[Dict], case_children: List[Dict]) -> Dict:
+
+        # separates conditions for constants and other conditional values
+        const_values, const_children = [], []
+        if_values, if_children = [], []
+        def_child = None
+        for i, val in enumerate(case_values):
+            const = val[CONSTANT] if len(val) == 1 and CONSTANT in val else None
+            child = case_children[i]
+            if val == 'default':
+                def_child = child
+            elif const is None:
+                if_values.append(val)
+                if_children.append(child)
+            else:
+                const_values.append(const)
+                const_children.append(child)
+
+        # first get nested if tree for children that are not constant (and therefore cannot be indexed)
+        root = tree = {}
+        for i, val in enumerate(if_values):
+            if False in tree:
+                tree = tree[False]  # nest if
+            # c = _combine_linear_functions(cond, _negate_linear_function(val))  # gets difference between planes
+            tree['if'] = {'eq': (branch, val)}  # creates equality comparison branch
+            tree[True] = if_children[i]
+            tree[False] = {}
+
+        # if no cases for constant conditionals, just return if tree
+        if len(const_children) == 0:
+            if False in tree:
+                tree[False] = def_child
+            else:
+                root = def_child
+            return root
+
+        if False in tree:
+            tree = tree[False]  # nest if
+
+        # then get switch-case tree (if needed)
+        # compares branch against const values (index table)
+        tree['if'] = KeyedPlane(KeyedVector(branch), const_values, 0)
+        for i, child in enumerate(const_children):
+            tree[i] = child
+        tree[None] = def_child
+        return root
 
     def _get_plane(self, expr: Dict, negate: bool = False) -> KeyedPlane or None:
         # KeyedPlane(KeyedVector(weights), threshold, comparison)
