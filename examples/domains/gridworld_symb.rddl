@@ -1,0 +1,119 @@
+/////////////////////////////////////////////////////////////////////
+// A simple gridworld environment with horizontal movement actions
+// and a goal loc that provides the agent with a reward. Movement
+// dynamics are influenced by wind, which with a certain probability
+// moves the agent in a random direction.
+// In this version, locations are symbolic rather numeric. This
+// example demonstrates how we can define fluents of "object" types
+// and how we can use fluents as parameters of other fluents.
+//
+// Author: Pedro Sequeira (pedrodbs@gmail.com)
+//
+/////////////////////////////////////////////////////////////////////
+domain gridworld {
+
+    requirements = {
+		concurrent          // multiagent parallel actions
+	};
+
+	types {
+  		agent : object;     // to support multiagent domain
+  		loc: object;
+        direction : {@left, @right, @none };
+	};
+
+    pvariables {
+
+        // environment parameters
+        REWARD: { non-fluent, real, default = 1 };
+        P-WIND: { non-fluent, real, default = 0.1 };
+
+        // agents' goal loc
+        GOAL(agent)             : { non-fluent, loc, default = null };
+        NEIGHBOR-LEFT(loc)      : { non-fluent, loc, default = null };
+        NEIGHBOR-RIGHT(loc)     : { non-fluent, loc, default = null };
+        HAS-NEIGHBOR-RIGHT(loc) : { non-fluent, bool, default = true };
+        HAS-NEIGHBOR-LEFT(loc)  : { non-fluent, bool, default = true };
+
+        // agents' loc
+        pos(agent)      : { observ-fluent, loc };
+		at-goal(agent)  : { observ-fluent, bool };
+		next-dir(agent) : { interm-fluent, direction, level = 1 };
+
+        // actions
+        do-nothing(agent)   : { action-fluent, bool, default = false };
+		move-left(agent)    : { action-fluent, bool, default = false };
+		move-right(agent)   : { action-fluent, bool, default = false };
+    };
+
+    cpfs {
+
+        // next direction based on actions and wind
+        next-dir(?a) =
+            if ( move-left(?a) ) then
+                Discrete(direction, @left   : 1 - P-WIND + P-WIND/3,
+                                    @right  : P-WIND/3,
+                                    @none   : P-WIND/3)
+            else if ( move-right(?a) ) then
+                Discrete(direction, @left   : P-WIND/3,
+                                    @right  : 1 - P-WIND + P-WIND/3,
+                                    @none   : P-WIND/3)
+            else
+                Discrete(direction, @left   : P-WIND/3,
+                                    @right  : P-WIND/3,
+                                    @none   : 1 - P-WIND + P-WIND/3);
+
+        // movement according to neighbors
+        pos(?a) = switch( next-dir(?a) ) {
+				case @left  : NEIGHBOR-LEFT(pos(?a)),
+				case @right : NEIGHBOR-RIGHT(pos(?a)),
+				default     : pos(?a)
+		};
+
+        at-goal'(?a) = pos'(?a) == GOAL(?a);
+    };
+
+    // reward given if agent is at goal
+    reward = sum_{?a : agent} [ at-goal(?a) * REWARD ];
+
+    state-action-constraints {
+
+        // action legality constraints (if current position has neighbor in each direction)
+        forall_{?a: agent} [ move-left(?a) => HAS-NEIGHBOR-LEFT(pos(?a)) ];
+        forall_{?a: agent} [ move-right(?a) => HAS-NEIGHBOR-RIGHT(pos(?a)) ];
+    };
+}
+
+
+non-fluents single_5 {
+	domain = gridworld;
+	objects {
+	    agent: { a1 };
+	    loc: { far_left, left, middle, right, far_right };
+	};
+	non-fluents {
+	    REWARD = 100;
+		P-WIND = 0.0;
+	    GOAL(a1) = far_right;
+        NEIGHBOR-LEFT(far_right) = right;
+        NEIGHBOR-LEFT(right) = middle;
+        NEIGHBOR-LEFT(middle) = left;
+        NEIGHBOR-LEFT(left) = far_left;
+        NEIGHBOR-RIGHT(right) = far_right;
+        NEIGHBOR-RIGHT(middle) = right;
+        NEIGHBOR-RIGHT(left) = middle;
+        NEIGHBOR-RIGHT(far_left) = left;
+        HAS-NEIGHBOR-LEFT(far_left) = false;
+        HAS-NEIGHBOR-RIGHT(far_right) = false;
+	};
+}
+
+instance single_5 {
+	domain = gridworld;
+	non-fluents = single_5;
+	init-state {
+		pos(a1) = far_left;
+	};
+	horizon  = 5;
+	discount = 0.9;
+}
