@@ -121,14 +121,13 @@ class _DynamicsConverter(_ExpressionConverter):
                 return self._get_decision_tree(expr[op], leaf_func)
 
             # otherwise return a tree that gets the truth value of the expression
-            return self._get_decision_tree(self._get_if_tree(
-                expr, {True: {CONSTANT: True}, False: {CONSTANT: False}}), leaf_func)
+            return self._get_decision_tree(
+                self._get_if_tree(expr, {CONSTANT: True}, {CONSTANT: False}), leaf_func)
 
         if 'if' in expr and len(expr) > 1:
             # check if no plane (branch) provided, then expression's truth value has to be resolved
             if isinstance(expr['if'], dict) and len(expr['if']) == 1:
-                return self._get_decision_tree(self._get_if_tree(
-                    expr['if'], {child: expr[child] for child in expr if child != 'if'}), leaf_func)
+                return self._get_decision_tree(self._get_if_tree(expr['if'], expr[True], expr[False]), leaf_func)
 
             assert isinstance(expr['if'], KeyedPlane), f'Could not parse RDDL expression, got invalid branch: "{expr}"!'
 
@@ -147,23 +146,20 @@ class _DynamicsConverter(_ExpressionConverter):
         # just return expression's value
         return makeTree(leaf_func(expr))
 
-    def _get_if_tree(self, branch: Dict, children: Dict) -> Dict:
-
-        def _assert_boolean_tree():
-            assert len(children) == 2 and True in children and False in children, \
-                f'Could not parse RDDL expression, boolean tree needs True and False children: {children}'
+    def _get_if_tree(self, branch: Dict, true_child: Dict, false_child: Dict) -> Dict:
 
         # first check if condition is constant
         const_val = _get_const_val(branch, bool)
         if const_val is not None:
-            _assert_boolean_tree()
-            return children[True] if const_val else children[False]
+            return true_child if const_val else false_child
 
         # then tries to get branching plane directly from condition
         plane = self._get_plane(branch)
         if plane is not None:
             # if we have a valid plane, then simply return if tree
-            return {'if': plane, **children}
+            return {'if': plane,
+                    True: true_child,
+                    False: false_child}
 
         # otherwise we have to build (possibly nested) PWL trees
         if 'logic_and' in branch and len(branch) == 1:
@@ -171,48 +167,43 @@ class _DynamicsConverter(_ExpressionConverter):
             assert len(sub_exprs) > 1, f'Could not parse RDDL expression, AND needs at least two arguments "{branch}"!'
             lhs = sub_exprs[0]
             rhs = {'logic_and': sub_exprs[1:]} if len(sub_exprs) > 2 else sub_exprs[1]
-            _assert_boolean_tree()
             return self._get_if_tree(lhs,
-                                     {True: self._get_if_tree(rhs, children),
-                                      False: children[False]})
+                                     self._get_if_tree(rhs, true_child, false_child),
+                                     false_child)
 
         if 'logic_or' in branch and len(branch) == 1:
             sub_exprs = branch['logic_or']
             assert len(sub_exprs) > 1, f'Could not parse RDDL expression, OR needs at least two arguments "{branch}"!'
             lhs = sub_exprs[0]
             rhs = {'logic_or': sub_exprs[1:]} if len(sub_exprs) > 2 else sub_exprs[1]
-            _assert_boolean_tree()
             return self._get_if_tree(lhs,
-                                     {True: children[True],
-                                      False: self._get_if_tree(rhs, children)})
+                                     true_child,
+                                     self._get_if_tree(rhs, true_child, false_child))
 
         if 'not' in branch and len(branch) == 1:
-            # if NOT, just swap branches
-            _assert_boolean_tree()
-            return self._get_if_tree(branch['not'], {True: children[False], False: children[True]})
+            # if NOT, just swap children
+            return self._get_if_tree(branch['not'], false_child, true_child)
 
         if 'equiv' in branch:
             # if logical EQUIVALENCE, true iff both sides are true or both are false
             lhs, rhs = branch['equiv']
-            _assert_boolean_tree()
             return self._get_if_tree(lhs,
-                                     {True: self._get_if_tree(rhs, children),
-                                      False: self._get_if_tree(rhs, {True: children[False], False: children[True]})})
+                                     self._get_if_tree(rhs, true_child, false_child),
+                                     self._get_if_tree(rhs, false_child, true_child))
 
         if 'imply' in branch:
             # if IMPLICATION, false only if left is true and right is false
             lhs, rhs = branch['imply']
-            _assert_boolean_tree()
             return self._get_if_tree(lhs,
-                                     {True: self._get_if_tree(rhs, children),
-                                      False: children[True]})
+                                     self._get_if_tree(rhs, true_child, false_child),
+                                     true_child)
 
         if 'switch' in branch:
             # if SWITCH, then propagate "if" children at each case child
             switch_branch, case_values, case_children = branch['switch']
             case_if_children = []
             for case_child in case_children:  # case child used as branch for the if subtree
-                case_if_children.append({'if': case_child, **children})
+                case_if_children.append({'if': case_child, True: true_child, False: false_child})
             return {'switch': (switch_branch, case_values, case_if_children)}
 
         raise ValueError(f'Could not parse RDDL expression, unknown PWL tree comparison "{branch}"!')
@@ -265,10 +256,10 @@ class _DynamicsConverter(_ExpressionConverter):
         return root
 
     def _get_plane(self, expr: Dict, negate: bool = False) -> KeyedPlane or None:
-        # KeyedPlane(KeyedVector(weights), threshold, comparison)
+        # signature: KeyedPlane(KeyedVector(weights), threshold, comparison)
 
         if 'not' in expr and len(expr) == 1:
-            # if NOT, get opposite operation
+            # if NOT, get negated operation
             return self._get_plane(expr['not'], negate=not negate)
 
         if _is_linear_function(expr):
