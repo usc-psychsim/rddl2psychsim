@@ -510,6 +510,39 @@ class TestRelational(unittest.TestCase):
                                                 s: s,
                                                 'default': 4}))
 
+    def test_switch_case_if(self):
+        rddl = '''
+                domain my_test {
+                    types {
+                        enum_level : {@low, @medium, @high};
+                    };
+                    pvariables { 
+                        p : { state-fluent,  enum_level, default = @low };
+                        q : { state-fluent,  enum_level, default = @low };
+                        a : { action-fluent, bool, default = false }; 
+                    };
+                    cpfs { p' = switch (q) {
+                                    case @low    : if(p==@medium) then @high else @low,
+                                    case @medium : if(p==@low) then @medium else @high,
+                                    default      : if(p==@high) then @low else @medium
+                                }; 
+                    };
+                    reward = 0;
+                }
+                non-fluents my_test_empty { domain = my_test; }
+                instance my_test_inst { domain = my_test; init-state { a; }; }
+                '''
+        conv = Converter()
+        conv.convert_str(rddl)
+        _p = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(_p, 'low')
+        conv.world.step()
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        q = conv.world.getState(WORLD, 'q', unique=True)
+        self.assertEqual(p, _python_switch(q, {'low': 'high' if p == 'medium' else 'low',
+                                               'medium': 'medium' if p == 'low' else 'high',
+                                               'default': 'low' if p == 'high' else 'medium'}))
+
     def test_switch_enum(self):
         rddl = '''
                 domain my_test {
@@ -625,6 +658,78 @@ class TestRelational(unittest.TestCase):
                                                    3: s,
                                                    3 + r: 3,
                                                    'default': 4 + 4}))
+
+    def test_if_switch_enum(self):
+        rddl = '''
+                domain my_test {
+                    types {
+                        enum_level : {@low, @medium, @high};
+                    };
+                    pvariables {
+                        p : { state-fluent,  enum_level, default = @low };
+                        q : { state-fluent,  enum_level, default = @low };
+                        a : { action-fluent, bool, default = false };
+                    };
+                    cpfs { p' = if (switch (q) {
+                                        case @low : true,
+                                        case @medium : true,
+                                        default : false
+                                    })
+                                then @high
+                                else @low;
+                    };
+                    reward = 0;
+                }
+                non-fluents my_test_empty { domain = my_test; }
+                instance my_test_inst { domain = my_test; init-state { a; }; }
+                '''
+        conv = Converter()
+        conv.convert_str(rddl)
+        _p = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(_p, 'low')
+        conv.world.step()
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        q = conv.world.getState(WORLD, 'q', unique=True)
+        self.assertEqual(p, 'high' if _python_switch(q, {'low': True,
+                                                         'medium': True,
+                                                         'default': False}) else 'low')
+
+    def test_if_switch_enum_var(self):
+        rddl = '''
+                domain my_test {
+                    types {
+                        enum_level : {@low, @medium, @high};
+                    };
+                    pvariables {
+                        p : { state-fluent,  enum_level, default = @low };
+                        q : { state-fluent,  enum_level, default = @low };
+                        r : { state-fluent,  bool, default = true };
+                        a : { action-fluent, bool, default = false };
+                    };
+                    cpfs { p' = if (switch (q) {
+                                        case @low : r,
+                                        case @medium : r,
+                                        default : ~r
+                                    })
+                                then @high
+                                else @low;
+                    };
+                    reward = 0;
+                }
+                non-fluents my_test_empty { domain = my_test; }
+                instance my_test_inst { domain = my_test; init-state { a; }; }
+                '''
+        conv = Converter()
+        conv.convert_str(rddl)
+        _p = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(_p, 'low')
+        conv.world.step()
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        q = conv.world.getState(WORLD, 'q', unique=True)
+        r = conv.world.getState(WORLD, 'r', unique=True)
+        self.assertEqual(p, 'high' if _python_switch(q, {'low': r,
+                                                         'medium': r,
+                                                         'default': not r}) else 'low')
 
 
 if __name__ == '__main__':

@@ -153,7 +153,13 @@ class _DynamicsConverter(_ExpressionConverter):
             assert len(children) == 2 and True in children and False in children, \
                 f'Could not parse RDDL expression, boolean tree needs True and False children: {children}'
 
-        # first tries to get plane directly from expression
+        # first check if condition is constant
+        const_val = _get_const_val(branch, bool)
+        if const_val is not None:
+            _assert_boolean_tree()
+            return children[True] if const_val else children[False]
+
+        # then tries to get branching plane directly from condition
         plane = self._get_plane(branch)
         if plane is not None:
             # if we have a valid plane, then simply return if tree
@@ -201,7 +207,13 @@ class _DynamicsConverter(_ExpressionConverter):
                                      {True: self._get_if_tree(rhs, children),
                                       False: children[True]})
 
-        # TODO switch expression? (replace case values (true/false) with branches??)
+        if 'switch' in branch:
+            # if SWITCH, then propagate "if" children at each case child
+            switch_branch, case_values, case_children = branch['switch']
+            case_if_children = []
+            for case_child in case_children:  # case child used as branch for the if subtree
+                case_if_children.append({'if': case_child, **children})
+            return {'switch': (switch_branch, case_values, case_if_children)}
 
         raise ValueError(f'Could not parse RDDL expression, unknown PWL tree comparison "{branch}"!')
 
