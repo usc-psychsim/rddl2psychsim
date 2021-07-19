@@ -148,30 +148,27 @@ class _DynamicsConverter(_ExpressionConverter):
 
     def _get_if_tree(self, branch: Dict, true_child: Dict, false_child: Dict) -> Dict:
 
-        # first check if condition is constant
+        # first check if condition is constant, return child accordingly
         const_val = _get_const_val(branch, bool)
         if const_val is not None:
             return true_child if const_val else false_child
 
         # then tries to get branching plane directly from condition
-        plane = self._get_plane(branch)
+        plane, negate = self._get_plane(branch)
         if plane is not None:
             # if we have a valid plane, then simply return if tree
             return {'if': plane,
-                    True: true_child,
-                    False: false_child}
+                    True: false_child if negate else true_child,
+                    False: true_child if negate else false_child}
 
         # otherwise we have to build (possibly nested) PWL trees
-        if 'logic_and' in branch and len(branch) == 1:
-            sub_exprs = branch['logic_and']
-            assert len(sub_exprs) > 1, f'Could not parse RDDL expression, AND needs at least two arguments "{branch}"!'
-            lhs = sub_exprs[0]
-            rhs = {'logic_and': sub_exprs[1:]} if len(sub_exprs) > 2 else sub_exprs[1]
-            return self._get_if_tree(lhs,
-                                     self._get_if_tree(rhs, true_child, false_child),
-                                     false_child)
+        if 'logic_and' in branch:
+            # negation, ~(A ^ B ^ ...) <= > ~A | ~B | ...
+            return self._get_if_tree({'logic_or': [{'not': sub_expr} for sub_expr in branch['logic_and']]},
+                                     false_child,
+                                     true_child)
 
-        if 'logic_or' in branch and len(branch) == 1:
+        if 'logic_or' in branch:
             sub_exprs = branch['logic_or']
             assert len(sub_exprs) > 1, f'Could not parse RDDL expression, OR needs at least two arguments "{branch}"!'
             lhs = sub_exprs[0]
@@ -180,7 +177,7 @@ class _DynamicsConverter(_ExpressionConverter):
                                      true_child,
                                      self._get_if_tree(rhs, true_child, false_child))
 
-        if 'not' in branch and len(branch) == 1:
+        if 'not' in branch:
             # if NOT, just swap children
             return self._get_if_tree(branch['not'], false_child, true_child)
 
@@ -255,124 +252,141 @@ class _DynamicsConverter(_ExpressionConverter):
         tree[None] = def_child
         return root
 
-    def _get_plane(self, expr: Dict, negate: bool = False) -> KeyedPlane or None:
+    def _get_plane(self, expr: Dict, negate: bool = False) -> Tuple[KeyedPlane or None, bool]:
         # signature: KeyedPlane(KeyedVector(weights), threshold, comparison)
 
         if 'not' in expr and len(expr) == 1:
             # if NOT, get negated operation
-            return self._get_plane(expr['not'], negate=not negate)
+            return self._get_plane(expr['not'], not negate)
 
         if _is_linear_function(expr):
             # assumes linear combination of all features in vector has to be > 0.5,
             # which is truth value in PsychSim (see psychsim.world.World.float2value)
-            return KeyedPlane(KeyedVector(expr), 0.5 + EPS, -1) if negate else \
-                KeyedPlane(KeyedVector(expr), 0.5, 1)
+            if negate:
+                return KeyedPlane(KeyedVector(expr), 0.5 + EPS, -1), False
+            else:
+                return KeyedPlane(KeyedVector(expr), 0.5, 1), False
 
         if 'action' in expr and len(expr['action']) == 3:
             # conditional on specific agent's action (agent's action == the action)
             agent, action, future = expr['action']
             key = makeFuture(actionKey(agent.name)) if future else actionKey(agent.name)  # check future vs prev action
             if negate:
-                return KeyedPlane(KeyedVector({key: 1}), action, 1) | KeyedPlane(KeyedVector({key: 1}), action, -1)
+                return (KeyedPlane(KeyedVector({key: 1}), action, 1) |
+                        KeyedPlane(KeyedVector({key: 1}), action, -1)), False
             else:
-                return KeyedPlane(KeyedVector({key: 1}), action, 0)
+                return KeyedPlane(KeyedVector({key: 1}), action, 0), False
 
         if 'linear_and' in expr and len(expr) == 1:
             # AND of features (sum > w_sum - 0.5), see psychsim.world.World.float2value
             # for negation, ~(A ^ B ^ ...) <=> ~A | ~B | ...
             expr = expr['linear_and']
             if negate:
-                return self._get_plane({'linear_or': _negate_linear_function(expr)})
+                return self._get_plane({'linear_or': _negate_linear_function(expr)}, False)
             else:
-                return KeyedPlane(KeyedVector(expr), sum([v for v in expr.values() if v > 0]) - 0.5, 1)
+                return KeyedPlane(KeyedVector(expr), sum([v for v in expr.values() if v > 0]) - 0.5, 1), False
 
         if 'linear_or' in expr and len(expr) == 1:
             # OR of features (A | B | ...) <=> ~(~A ^ ~B ^ ...)
             # for negation, ~(A | B | ...) <=> ~A ^ ~B ^ ...
             expr = expr['linear_or']
             if negate:
-                return self._get_plane({'linear_and': _negate_linear_function(expr)})
+                return self._get_plane({'linear_and': _negate_linear_function(expr)}, False)
             else:
                 expr = _negate_linear_function(expr)
-                return KeyedPlane(KeyedVector(expr), sum([v for v in expr.values() if v > 0]) - 0.5 + EPS, -1)
+                return KeyedPlane(KeyedVector(expr), sum([v for v in expr.values() if v > 0]) - 0.5 + EPS, -1), False
 
         if 'logic_and' in expr and len(expr) == 1:
-            # get conjunction between sub-expressions (all planes must be valid)
-            # for negation, ~(A ^ B ^ ...) <=> ~A | ~B |...
-            sub_exprs = expr['logic_and']
-            if negate:
-                planes = [self._get_plane({'not': sub_expr}) for sub_expr in sub_exprs]
-                invalid = None in planes or any(len(plane.planes) > 1 and plane.isConjunction for plane in planes)
-                return None if invalid else reduce(lambda p1, p2: p1 | p2, planes)  # disjunction
-            else:
-                planes = [self._get_plane(sub_expr) for sub_expr in sub_exprs]
-                invalid = None in planes or any(len(plane.planes) > 1 and not plane.isConjunction for plane in planes)
-                return None if invalid else reduce(lambda p1, p2: p1 & p2, planes)  # conjunction
+            # negation, ~(A ^ B ^ ...) <= > ~A | ~B | ...
+            return self._get_plane({'logic_or': [{'not': sub_expr} for sub_expr in expr['logic_and']]}, not negate)
 
         if 'logic_or' in expr and len(expr) == 1:
             # get disjunction between sub-expressions (all planes must be valid)
             # for negation, ~(A | B | ...) <=> ~A ^ ~B ^ ...
             sub_exprs = expr['logic_or']
-            if negate:
-                planes = [self._get_plane({'not': sub_expr}) for sub_expr in sub_exprs]
-                invalid = None in planes or any(len(plane.planes) > 1 and not plane.isConjunction for plane in planes)
-                return None if invalid else reduce(lambda p1, p2: p1 & p2, planes)  # conjunction
-            else:
-                planes = [self._get_plane(sub_expr) for sub_expr in sub_exprs]
-                invalid = None in planes or any(len(plane.planes) > 1 and plane.isConjunction for plane in planes)
-                return None if invalid else reduce(lambda p1, p2: p1 | p2, planes)  # disjunction
+            planes = [self._get_plane(sub_expr) for sub_expr in sub_exprs]
+            negates = [p[1] for p in planes]
+            planes = [p[0] for p in planes]
+            if None in planes:
+                return None, negate
+            if all(negates) and all(len(plane.planes) == 1 or plane.isConjunction for plane in planes):
+                # ~A | ~B | ... <=> ~ (A ^ B ^ ...)
+                return reduce(lambda p1, p2: p1 & p2, planes), not negate  # conjunction
+            invalid = any(negates) or any(len(plane.planes) > 1 and plane.isConjunction for plane in planes)
+            return (None if invalid else reduce(lambda p1, p2: p1 | p2, planes)), negate  # disjunction
 
         # test binary operators
         op = next(iter(expr.keys()))
         if len(expr) == 1 and op in {'eq', 'neq', 'gt', 'lt', 'geq', 'leq', 'imply'}:
             lhs, rhs = expr[op]
-            if (not negate and 'eq' in expr) or (negate and 'neq' in expr):
-                # takes equality of pwl comb in vectors (difference==0 or expr==threshold)
-                weights, thresh = self._get_relational_plane_thresh(lhs, rhs)
-                return KeyedPlane(KeyedVector(weights), thresh, 0)
-
-            if (not negate and 'neq' in expr) or (negate and 'eq' in expr):
-                # takes equality of pwl comb in vectors (difference!=0 or expr!=threshold)
-                weights, thresh = self._get_relational_plane_thresh(lhs, rhs)
-                return KeyedPlane(KeyedVector(weights), thresh, 1) | KeyedPlane(KeyedVector(weights), thresh, -1)
-
-            if (not negate and 'gt' in expr) or (negate and 'leq' in expr):
-                # takes diff of pwl comb in vectors (difference>0 or expr>threshold)
-                weights, thresh = self._get_relational_plane_thresh(lhs, rhs)
-                return KeyedPlane(KeyedVector(weights), thresh, 1)
-
-            if (not negate and 'lt' in expr) or (negate and 'geq' in expr):
-                # takes diff of pwl comb in vectors (difference<0 or expr<threshold)
-                weights, thresh = self._get_relational_plane_thresh(lhs, rhs)
-                return KeyedPlane(KeyedVector(weights), thresh, -1)
-
-            if (not negate and 'geq' in expr) or (negate and 'lt' in expr):
-                # takes diff of pwl comb in vectors (difference>=0 or expr>=threshold)
-                weights, thresh = self._get_relational_plane_thresh(lhs, rhs)
-                if isinstance(thresh, str):
-                    return KeyedPlane(KeyedVector(weights), thresh, 1) | KeyedPlane(KeyedVector(weights), thresh, 0)
+            if 'eq' in expr:
+                if negate:
+                    return self._get_plane({'neq': expr['eq']}, False)
                 else:
-                    return KeyedPlane(KeyedVector(weights), thresh - EPS, 1)
+                    # takes equality of pwl comb in vectors (difference==0 or expr==threshold)
+                    weights, thresh = self._get_relational_plane_thresh(lhs, rhs)
+                    return KeyedPlane(KeyedVector(weights), thresh, 0), False
 
-            if (not negate and 'leq' in expr) or (negate and 'gt' in expr):
-                # takes diff of pwl comb in vectors (difference<=0 or expr<=threshold)
-                weights, thresh = self._get_relational_plane_thresh(lhs, rhs)
-                if isinstance(thresh, str):
-                    KeyedPlane(KeyedVector(weights), thresh, -1) | KeyedPlane(KeyedVector(weights), thresh, 0)
+            if 'neq' in expr:
+                if negate:
+                    return self._get_plane({'eq': expr['neq']}, False)
                 else:
-                    return KeyedPlane(KeyedVector(weights), thresh + EPS, -1)
+                    # takes inequality of pwl comb in vectors (difference!=0 or expr!=threshold)
+                    weights, thresh = self._get_relational_plane_thresh(lhs, rhs)
+                    return (KeyedPlane(KeyedVector(weights), thresh, 1) |
+                            KeyedPlane(KeyedVector(weights), thresh, -1)), False
+
+            if 'gt' in expr:
+                if negate:
+                    return self._get_plane({'leq': expr['gt']}, False)
+                else:
+                    # takes diff of pwl comb in vectors (difference>0 or expr>threshold)
+                    weights, thresh = self._get_relational_plane_thresh(lhs, rhs)
+                    return KeyedPlane(KeyedVector(weights), thresh, 1), False
+
+            if 'lt' in expr:
+                if negate:
+                    return self._get_plane({'geq': expr['lt']}, False)
+                else:
+                    # takes diff of pwl comb in vectors (difference<0 or expr<threshold)
+                    weights, thresh = self._get_relational_plane_thresh(lhs, rhs)
+                    return KeyedPlane(KeyedVector(weights), thresh, -1), False
+
+            if 'geq' in expr:
+                if negate:
+                    return self._get_plane({'lt': expr['geq']}, False)
+                else:
+                    # takes diff of pwl comb in vectors (difference>=0 or expr>=threshold)
+                    weights, thresh = self._get_relational_plane_thresh(lhs, rhs)
+                    if isinstance(thresh, str):
+                        return (KeyedPlane(KeyedVector(weights), thresh, 1) |
+                                KeyedPlane(KeyedVector(weights), thresh, 0)), False
+                    else:
+                        return KeyedPlane(KeyedVector(weights), thresh - EPS, 1), False
+
+            if 'leq' in expr:
+                if negate:
+                    return self._get_plane({'gt': expr['leq']}, False)
+                else:
+                    # takes diff of pwl comb in vectors (difference<=0 or expr<=threshold)
+                    weights, thresh = self._get_relational_plane_thresh(lhs, rhs)
+                    if isinstance(thresh, str):
+                        return (KeyedPlane(KeyedVector(weights), thresh, -1) |
+                                KeyedPlane(KeyedVector(weights), thresh, 0)), False
+                    else:
+                        return KeyedPlane(KeyedVector(weights), thresh + EPS, -1), False
 
             if 'imply' in expr:
                 # if IMPLICATION, false only if left is true and right is false, ie
                 # true if left is false or right is true
                 if not (_is_linear_function(lhs) and _is_linear_function(rhs)):
-                    return None  # both operands have to be linear combinations
+                    return None, negate  # both operands have to be linear combinations
                 if negate:
-                    return KeyedPlane(KeyedVector(lhs), 0.5, 1) & KeyedPlane(KeyedVector(rhs), 0.5 + EPS, -1)
+                    return (KeyedPlane(KeyedVector(lhs), 0.5, 1) & KeyedPlane(KeyedVector(rhs), 0.5 + EPS, -1)), False
                 else:
-                    return KeyedPlane(KeyedVector(lhs), 0.5 + EPS, -1) | KeyedPlane(KeyedVector(rhs), 0.5, 1)
+                    return (KeyedPlane(KeyedVector(lhs), 0.5 + EPS, -1) | KeyedPlane(KeyedVector(rhs), 0.5, 1)), False
 
-        return None
+        return None, negate
 
     def _get_relational_plane_thresh(self, lhs: Dict, rhs: Dict) -> Tuple[Dict, str or int]:
         if _is_linear_function(lhs) and _is_linear_function(rhs):

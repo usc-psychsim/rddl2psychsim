@@ -643,7 +643,6 @@ class TestAggregation(unittest.TestCase):
         conv = Converter()
         conv.convert_str(rddl)
         dyn = conv.world.getDynamics(stateKey(WORLD, 'p'), True)[0]
-        self.assertTrue(dyn.branch.isConjunction)
         self.assertEqual(len(dyn.branch.planes), len(objs))
         p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
@@ -661,7 +660,7 @@ class TestAggregation(unittest.TestCase):
                         q(obj) : {{ state-fluent, int, default = -1 }};
                         a : {{ action-fluent, bool, default = false }}; 
                     }};
-                    cpfs {{ p' = forall_{{?x : obj}}[ q(?x) >= 1 | p  ]; }}; 
+                    cpfs {{ p' = forall_{{?x : obj}}[ ~ (~(q(?x) >= 1) ^ ~p)  ]; }}; 
                     reward = 0;
                 }}
                 non-fluents my_test_nf {{ 
@@ -714,7 +713,6 @@ class TestAggregation(unittest.TestCase):
         conv = Converter()
         conv.convert_str(rddl)
         dyn = conv.world.getDynamics(stateKey(WORLD, 'p'), True)[0]
-        self.assertTrue(dyn.branch.isConjunction)
         self.assertEqual(len(dyn.branch.planes), len(objs) * 2)  # forall AND x AND inside forall
         p_ = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p_, True)
