@@ -684,6 +684,143 @@ class TestAggregation(unittest.TestCase):
         p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, all(q >= 1 or p_ for q in objs.values()))
 
+    def test_fluent_forall_forall(self):
+        objs = {('x1', 'y1'): 1,
+                ('x1', 'y2'): 2,
+                ('x2', 'y1'): 3,
+                ('x2', 'y2'): 4}
+        rddl = f'''
+                domain my_test {{
+                    types {{ 
+                        x_obj : object;
+                        y_obj : object; 
+                    }};
+                    pvariables {{ 
+                        p : {{ state-fluent, bool, default = true }};
+                        q(x_obj, y_obj) : {{ state-fluent, int, default = -1 }};
+                        a : {{ action-fluent, bool, default = false }}; 
+                    }};
+                    cpfs {{ p' = forall_{{?x : x_obj}}[ forall_{{?y : y_obj}}[ q(?x,?y) > 0 ]]; }}; 
+                    reward = 0;
+                }}
+                non-fluents my_test_nf {{ 
+                    domain = my_test; 
+                    objects {{
+                        x_obj : {{{', '.join({x for x, _ in objs.keys()})}}};
+                        y_obj : {{{', '.join({y for _, y in objs.keys()})}}};
+                    }};
+                }}
+                instance my_test_inst {{ 
+                    domain = my_test; 
+                    init-state {{
+                        {'; '.join(f'q({",".join(o)}) = {v}' for o, v in objs.items())};
+                    }}; 
+                }}
+                '''
+        conv = Converter()
+        conv.convert_str(rddl)
+        dyn = conv.world.getDynamics(stateKey(WORLD, 'p'), True)[0]
+        self.assertFalse(dyn.branch.isConjunction)
+        self.assertEqual(len(dyn.branch.planes), len(objs))
+        p_ = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p_, True)
+        conv.world.step()
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p, all(all(objs[(x, y)] > 0
+                                    for y in set(y for _, y in objs.keys()))
+                                for x in set(x for x, _ in objs.keys())))
+
+    def test_fluent_forall_exists(self):
+        objs = {('x1', 'y1'): 1,
+                ('x1', 'y2'): 3,
+                ('x2', 'y1'): 2,
+                ('x2', 'y2'): 4}
+        rddl = f'''
+                domain my_test {{
+                    types {{ 
+                        x_obj : object;
+                        y_obj : object; 
+                    }};
+                    pvariables {{ 
+                        p : {{ state-fluent, bool, default = true }};
+                        q(x_obj, y_obj) : {{ state-fluent, int, default = -1 }};
+                        a : {{ action-fluent, bool, default = false }}; 
+                    }};
+                    cpfs {{ p' = forall_{{?x : x_obj}}[ exists_{{?y : y_obj}}[ q(?x,?y) >= 3 ]]; }}; 
+                    reward = 0;
+                }}
+                non-fluents my_test_nf {{ 
+                    domain = my_test; 
+                    objects {{
+                        x_obj : {{{', '.join({x for x, _ in objs.keys()})}}};
+                        y_obj : {{{', '.join({y for _, y in objs.keys()})}}};
+                    }};
+                }}
+                instance my_test_inst {{ 
+                    domain = my_test; 
+                    init-state {{
+                        {'; '.join(f'q({",".join(o)}) = {v}' for o, v in objs.items())};
+                    }}; 
+                }}
+                '''
+        conv = Converter()
+        conv.convert_str(rddl)
+        dyn = conv.world.getDynamics(stateKey(WORLD, 'p'), True)[0]
+        self.assertFalse(dyn.branch.isConjunction)
+        p_ = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p_, True)
+        conv.world.step()
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p, all(any(objs[(x, y)] >= 3
+                                    for y in set(y for _, y in objs.keys()))
+                                for x in set(x for x, _ in objs.keys())))
+
+    def test_fluent_forall_not_exists(self):
+        objs = {('x1', 'y1'): 1,
+                ('x1', 'y2'): 3,
+                ('x2', 'y1'): 2,
+                ('x2', 'y2'): 4}
+        rddl = f'''
+                domain my_test {{
+                    types {{ 
+                        x_obj : object;
+                        y_obj : object; 
+                    }};
+                    pvariables {{ 
+                        p : {{ state-fluent, bool, default = true }};
+                        q(x_obj, y_obj) : {{ state-fluent, int, default = -1 }};
+                        a : {{ action-fluent, bool, default = false }}; 
+                    }};
+                    cpfs {{ p' = forall_{{?x : x_obj}}[ ~ exists_{{?y : y_obj}}[ q(?x,?y) < 1 ]]; }}; 
+                    reward = 0;
+                }}
+                non-fluents my_test_nf {{ 
+                    domain = my_test; 
+                    objects {{
+                        x_obj : {{{', '.join({x for x, _ in objs.keys()})}}};
+                        y_obj : {{{', '.join({y for _, y in objs.keys()})}}};
+                    }};
+                }}
+                instance my_test_inst {{ 
+                    domain = my_test; 
+                    init-state {{
+                        {'; '.join(f'q({",".join(o)}) = {v}' for o, v in objs.items())};
+                    }}; 
+                }}
+                '''
+        conv = Converter()
+        conv.convert_str(rddl)
+        dyn = conv.world.getDynamics(stateKey(WORLD, 'p'), True)[0]
+        self.assertFalse(dyn.branch.isConjunction)
+        self.assertEqual(len(dyn.branch.planes), len(objs))
+        p_ = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p_, True)
+        conv.world.step()
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p, all(not any(objs[(x, y)] < 1
+                                        for y in set(y for _, y in objs.keys()))
+                                for x in set(x for x, _ in objs.keys())))
+
     def test_fluent_forall_and(self):
         objs = {'x1': 1, 'x2': 2, 'x3': 3, 'x4': 4}
         rddl = f'''
@@ -1061,6 +1198,143 @@ class TestAggregation(unittest.TestCase):
         conv.world.step()
         p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, any(q > 3 or p_ for q in objs.values()))
+
+    def test_fluent_exists_exists(self):
+        objs = {('x1', 'y1'): 1,
+                ('x1', 'y2'): 2,
+                ('x2', 'y1'): 3,
+                ('x2', 'y2'): 4}
+        rddl = f'''
+                domain my_test {{
+                    types {{ 
+                        x_obj : object;
+                        y_obj : object; 
+                    }};
+                    pvariables {{ 
+                        p : {{ state-fluent, bool, default = true }};
+                        q(x_obj, y_obj) : {{ state-fluent, int, default = -1 }};
+                        a : {{ action-fluent, bool, default = false }}; 
+                    }};
+                    cpfs {{ p' = exists_{{?x : x_obj}}[ exists_{{?y : y_obj}}[ q(?x,?y) > 3 ]]; }}; 
+                    reward = 0;
+                }}
+                non-fluents my_test_nf {{ 
+                    domain = my_test; 
+                    objects {{
+                        x_obj : {{{', '.join({x for x, _ in objs.keys()})}}};
+                        y_obj : {{{', '.join({y for _, y in objs.keys()})}}};
+                    }};
+                }}
+                instance my_test_inst {{ 
+                    domain = my_test; 
+                    init-state {{
+                        {'; '.join(f'q({",".join(o)}) = {v}' for o, v in objs.items())};
+                    }}; 
+                }}
+                '''
+        conv = Converter()
+        conv.convert_str(rddl)
+        dyn = conv.world.getDynamics(stateKey(WORLD, 'p'), True)[0]
+        self.assertFalse(dyn.branch.isConjunction)
+        self.assertEqual(len(dyn.branch.planes), len(objs))
+        p_ = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p_, True)
+        conv.world.step()
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p, any(any(objs[(x, y)] > 3
+                                    for y in set(y for _, y in objs.keys()))
+                                for x in set(x for x, _ in objs.keys())))
+
+    def test_fluent_exists_forall(self):
+        objs = {('x1', 'y1'): 1,
+                ('x1', 'y2'): 2,
+                ('x2', 'y1'): 3,
+                ('x2', 'y2'): 4}
+        rddl = f'''
+                domain my_test {{
+                    types {{ 
+                        x_obj : object;
+                        y_obj : object; 
+                    }};
+                    pvariables {{ 
+                        p : {{ state-fluent, bool, default = true }};
+                        q(x_obj, y_obj) : {{ state-fluent, int, default = -1 }};
+                        a : {{ action-fluent, bool, default = false }}; 
+                    }};
+                    cpfs {{ p' = exists_{{?x : x_obj}}[ forall_{{?y : y_obj}}[ q(?x,?y) >= 3 ]]; }}; 
+                    reward = 0;
+                }}
+                non-fluents my_test_nf {{ 
+                    domain = my_test; 
+                    objects {{
+                        x_obj : {{{', '.join({x for x, _ in objs.keys()})}}};
+                        y_obj : {{{', '.join({y for _, y in objs.keys()})}}};
+                    }};
+                }}
+                instance my_test_inst {{ 
+                    domain = my_test; 
+                    init-state {{
+                        {'; '.join(f'q({",".join(o)}) = {v}' for o, v in objs.items())};
+                    }}; 
+                }}
+                '''
+        conv = Converter()
+        conv.convert_str(rddl)
+        dyn = conv.world.getDynamics(stateKey(WORLD, 'p'), True)[0]
+        self.assertFalse(dyn.branch.isConjunction)
+        p_ = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p_, True)
+        conv.world.step()
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p, any(all(objs[(x, y)] >= 3
+                                    for y in set(y for _, y in objs.keys()))
+                                for x in set(x for x, _ in objs.keys())))
+
+    def test_fluent_exists_not_forall(self):
+        objs = {('x1', 'y1'): 1,
+                ('x1', 'y2'): 2,
+                ('x2', 'y1'): 3,
+                ('x2', 'y2'): 4}
+        rddl = f'''
+                domain my_test {{
+                    types {{ 
+                        x_obj : object;
+                        y_obj : object; 
+                    }};
+                    pvariables {{ 
+                        p : {{ state-fluent, bool, default = true }};
+                        q(x_obj, y_obj) : {{ state-fluent, int, default = -1 }};
+                        a : {{ action-fluent, bool, default = false }}; 
+                    }};
+                    cpfs {{ p' = exists_{{?x : x_obj}}[ ~ forall_{{?y : y_obj}}[ q(?x,?y) >= 3 ]]; }}; 
+                    reward = 0;
+                }}
+                non-fluents my_test_nf {{ 
+                    domain = my_test; 
+                    objects {{
+                        x_obj : {{{', '.join({x for x, _ in objs.keys()})}}};
+                        y_obj : {{{', '.join({y for _, y in objs.keys()})}}};
+                    }};
+                }}
+                instance my_test_inst {{ 
+                    domain = my_test; 
+                    init-state {{
+                        {'; '.join(f'q({",".join(o)}) = {v}' for o, v in objs.items())};
+                    }}; 
+                }}
+                '''
+        conv = Converter()
+        conv.convert_str(rddl)
+        dyn = conv.world.getDynamics(stateKey(WORLD, 'p'), True)[0]
+        self.assertFalse(dyn.branch.isConjunction)
+        self.assertEqual(len(dyn.branch.planes), len(objs))
+        p_ = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p_, True)
+        conv.world.step()
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p, any(not all(objs[(x, y)] >= 3
+                                        for y in set(y for _, y in objs.keys()))
+                                for x in set(x for x, _ in objs.keys())))
 
     def test_invalid_fluent_exists_if(self):
         objs = {'x1': 1, 'x2': 2, 'x3': 3, 'x4': 4}
