@@ -82,8 +82,7 @@ class _ConstraintsConverter(_DynamicsConverter):
             return
 
         # otherwise store dynamics tree for a (external) boolean variable, for later online assertion
-        tree = self._get_dynamics_tree(
-            _ASSERTION_KEY, self._get_if_tree(expr, {CONSTANT: True}, {CONSTANT: False}))
+        tree = self._get_dynamics_tree(_ASSERTION_KEY, expr)
         legal_tree = tree.desymbolize(self.world.symbols)
         self._constraint_trees[legal_tree] = constraint
         logging.info(f'Added dynamic state constraint:\n{tree}')
@@ -94,8 +93,7 @@ class _ConstraintsConverter(_DynamicsConverter):
             agent = expr['imply'][0]['action'][0]
             action = expr['imply'][0]['action'][1]
             # get condition expression as 'if' legality tree
-            legal_tree = self._get_legality_tree(
-                self._get_if_tree(expr['imply'][1], {CONSTANT: True}, {CONSTANT: False}))
+            legal_tree = self._get_legality_tree(expr['imply'][1])
             return agent, action, legal_tree
 
         if 'action' in expr or _get_const_val(expr, bool):
