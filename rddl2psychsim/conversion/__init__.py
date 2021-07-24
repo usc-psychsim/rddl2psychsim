@@ -200,9 +200,15 @@ class _ConverterBase(object):
             logging.info(f'\tdiscount: {agent.getAttribute("discount", model)}')
 
     def _convert_constants(self):
-        # first try to initialize non-fluents from definition's default value
         logging.info('__________________________________________________')
         self.constants = {}
+
+        # creates constants from object values (the values might be used in expressions)
+        for obj_name, obj_values in self.model.non_fluents.objects:
+            self.constants.update({obj_val: obj_val for obj_val in obj_values})
+            logging.info(f'Added {len(obj_values)} constant values for object type "{obj_name}"')
+
+        # try to initialize non-fluents from definition's default value
         for nf in self.model.domain.non_fluents.values():
             if nf.arity > 0:
                 # gets all parameter combinations
@@ -326,6 +332,10 @@ class _ConverterBase(object):
     def _initialize_variables(self):
         # initialize variables from instance def
         logging.info('__________________________________________________')
+        if not hasattr(self.model.instance, 'init_state'):
+            logging.info('Domain instance does not have "init_state" section, skipping feature initialization')
+            return  # no initial state definitions
+
         for sf, val in self.model.instance.init_state:
             f_name = sf if sf[1] is None else (sf[0], *sf[1])
             if any(self._is_action(f_name, agent) for agent in self.world.agents.values()):
