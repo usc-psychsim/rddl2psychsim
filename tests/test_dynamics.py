@@ -6,7 +6,7 @@ __author__ = 'Pedro Sequeira'
 __email__ = 'pedrodbs@gmail.com'
 
 
-class TestMultiagent(unittest.TestCase):
+class TestDynamics(unittest.TestCase):
 
     def test_fluent_const(self):
         rddl = '''
@@ -171,7 +171,108 @@ class TestMultiagent(unittest.TestCase):
             self.assertIn(a2, conv.world.dynamics[p])
             self.assertIn(True, conv.world.dynamics[p])
 
-    def test_actions_conditions_multi(self):
+    def test_actions_conditions_or(self):
+        rddl = '''
+                domain my_test {
+                    pvariables { 
+                        p : { state-fluent,  int, default = 1 };
+                        a1 : { action-fluent, bool, default = false }; 
+                        a2 : { action-fluent, bool, default = false }; 
+                    };
+                    cpfs { p' = if ( a1 | a2 ) then p + 1 else 2; }; 
+                    reward = 0;
+                }
+                non-fluents my_test_empty { domain = my_test; }
+                instance my_test_inst { domain = my_test; init-state { a1; }; }
+                '''
+        conv = Converter()
+        conv.convert_str(rddl)
+        self.assertIn(stateKey(WORLD, 'p'), conv.world.dynamics)
+        self.assertEqual(len(conv.world.dynamics[stateKey(WORLD, 'p')]), 3)  # 2 actions + True
+        self.assertIn(True, conv.world.dynamics[stateKey(WORLD, 'p')])
+        self.assertEqual(len(conv.world.dynamics[True]), 1)
+        for action in next(iter(conv.world.agents.values())).actions:
+            self.assertIn(action, conv.world.dynamics[stateKey(WORLD, 'p')])
+            self.assertEqual(len(conv.world.dynamics[action]), 1)
+
+    def test_action_condition_or_fluent(self):
+        rddl = '''
+                domain my_test {
+                    pvariables { 
+                        p : { state-fluent,  int, default = 1 };
+                        q : { state-fluent,  bool, default = false };
+                        a : { action-fluent, bool, default = false }; 
+                    };
+                    cpfs { p' = if ( a | q ) then p + 1 else 2; }; 
+                    reward = 0;
+                }
+                non-fluents my_test_empty { domain = my_test; }
+                instance my_test_inst { domain = my_test; init-state { a; }; }
+                '''
+        conv = Converter()
+        conv.convert_str(rddl)
+        self.assertIn(stateKey(WORLD, 'p'), conv.world.dynamics)
+        self.assertEqual(len(conv.world.dynamics[stateKey(WORLD, 'p')]), 2)  # 1 action + True
+        self.assertIn(True, conv.world.dynamics[stateKey(WORLD, 'p')])
+        self.assertEqual(len(conv.world.dynamics[True]), 1)
+        action = next(iter(next(iter(conv.world.agents.values())).actions))
+        self.assertIn(action, conv.world.dynamics[stateKey(WORLD, 'p')])
+        self.assertEqual(len(conv.world.dynamics[action]), 1)
+
+    def test_actions_conditions_and(self):
+        rddl = '''
+                domain my_test {
+                    pvariables { 
+                        p : { state-fluent,  int, default = 1 };
+                        a1 : { action-fluent, bool, default = false }; 
+                        a2 : { action-fluent, bool, default = false }; 
+                    };
+                    cpfs { p' = if ( a1 ^ a2 ) then p + 1 else 123; }; 
+                    reward = 0;
+                }
+                non-fluents my_test_empty { domain = my_test; }
+                instance my_test_inst { domain = my_test; init-state { a1; }; }
+                '''
+        conv = Converter()
+        conv.convert_str(rddl)
+        self.assertIn(stateKey(WORLD, 'p'), conv.world.dynamics)
+        self.assertEqual(len(conv.world.dynamics[stateKey(WORLD, 'p')]), 1)  # True
+        self.assertIn(True, conv.world.dynamics[stateKey(WORLD, 'p')])
+        self.assertEqual(len(conv.world.dynamics[True]), 1)
+        for action in next(iter(conv.world.agents.values())).actions:
+            self.assertIn(action, conv.world.dynamics)
+            self.assertEqual(len(conv.world.dynamics[action]), 0)   # not conditioned
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p, 1)
+        conv.world.step()
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p, 123)
+
+    def test_action_condition_and_fluent(self):
+        rddl = '''
+                domain my_test {
+                    pvariables { 
+                        p : { state-fluent,  int, default = 1 };
+                        q : { state-fluent,  bool, default = false };
+                        a : { action-fluent, bool, default = false }; 
+                    };
+                    cpfs { p' = if ( a ^ q ) then p + 1 else 2; }; 
+                    reward = 0;
+                }
+                non-fluents my_test_empty { domain = my_test; }
+                instance my_test_inst { domain = my_test; init-state { a; }; }
+                '''
+        conv = Converter()
+        conv.convert_str(rddl)
+        self.assertIn(stateKey(WORLD, 'p'), conv.world.dynamics)
+        self.assertEqual(len(conv.world.dynamics[stateKey(WORLD, 'p')]), 2)  # 1 action + True
+        self.assertIn(True, conv.world.dynamics[stateKey(WORLD, 'p')])
+        self.assertEqual(len(conv.world.dynamics[True]), 1)
+        action = next(iter(next(iter(conv.world.agents.values())).actions))
+        self.assertIn(action, conv.world.dynamics[stateKey(WORLD, 'p')])
+        self.assertEqual(len(conv.world.dynamics[action]), 1)
+
+    def test_actions_conditions_exists(self):
         rddl = '''
                 domain my_test {
                     types { agent : object; };
