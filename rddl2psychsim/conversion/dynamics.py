@@ -91,59 +91,68 @@ class _DynamicsConverter(_ExpressionConverter):
                 return action
 
         dynamics = {True: expression}  # default: assign dynamics to world
-        if 'if' in expression:
-            if_expr = expression['if']
+        if 'if' not in expression:
+            return dynamics
+        if_expr = expression['if']
 
-            # check if we can pull actions from the sub-expressions in the form "if (action) then dyn_expr"
-            action = _is_action_conditioned(if_expr)
-            if action is not None:
-                # if single action, assigns dynamics to action and processes rest of expression
-                dynamics = {action: expression[True]}
-                dynamics.update(self._extract_action_dynamics(expression[False]))
+        # check if we can pull actions from the sub-expressions in the form "if (action) then dyn_expr"
+        action = _is_action_conditioned(if_expr)
+        if action is not None:
+            # if single action, assign True branch dynamics to action and process False branch
+            dynamics = {action: expression[True]}
+            dynamics.update(self._extract_action_dynamics(expression[False]))
+            return dynamics
+
+        if 'logic_and' in if_expr:
+            # if AND, only one action can be in the conjunction
+            action_idx = -1
+            action = None
+            sub_exprs = if_expr['logic_and']
+            for i, sub_expr in enumerate(sub_exprs):
+                a = _is_action_conditioned(sub_expr)
+                if a is not None:
+                    if action_idx != -1:
+                        action_idx = -1  # one agent can only perform max one action at a time
+                        break
+                    action_idx = i
+                    action = a
+            if action_idx == -1:  # expression is not action-conditioned
                 return dynamics
 
-            if 'logic_and' in if_expr:
-                # if AND, only one action can be in the conjunction
-                action_idx = -1
-                action = None
-                sub_exprs = if_expr['logic_and']
-                for i, sub_expr in enumerate(sub_exprs):
-                    a = _is_action_conditioned(sub_expr)
-                    if a is not None:
-                        if action_idx != -1:
-                            action_idx = -1  # one agent can only perform max one action at a time
-                            break
-                        action_idx = i
-                        action = a
-                if action_idx == -1:  # expression is not action-conditioned
-                    return dynamics
+            # if only one action in conjunction, remove it from conjunction and set its dynamics
+            and_expr = tuple(sub_expr for i, sub_expr in enumerate(sub_exprs) if i != action_idx)
+            dynamics = self._extract_action_dynamics(expression[False])
+            return {action: {'if': {'logic_and': and_expr}, True: expression[True], False: dynamics[True]}}
 
-                # if only one action in conjunction,
-                # set its dynamics and remove it from conjunction and set dynamics to world
-                if_expr['logic_and'] = tuple(sub_expr for i, sub_expr in enumerate(sub_exprs) if i != action_idx)
-                return {action: expression[True], True: expression}
-
-            if 'logic_or' in if_expr:
-                # if OR, multiple actions can be in the disjunction, will all have the same dynamics
-                action_idxs = []
-                actions = []
-                sub_exprs = if_expr['logic_or']
-                for i, sub_expr in enumerate(sub_exprs):
-                    a = _is_action_conditioned(sub_expr)
-                    if a is not None:
-                        action_idxs.append(i)
-                        actions.append(a)
-                if len(actions) == 0:  # expression is not action-conditioned
-                    return dynamics
-
-                # set True branch dynamics to actions, remove them from disjunction and set dynamics to world
-                if_expr['logic_or'] = tuple(sub_expr for i, sub_expr in enumerate(sub_exprs) if i not in action_idxs)
-                dynamics = {action: expression[True] for action in actions}
-                if len(if_expr['logic_or']) > 0:
-                    dynamics[True] = expression  # set if dynamics to world
-                else:
-                    dynamics.update(self._extract_action_dynamics(expression[False]))  # processes rest of expression
+        if 'logic_or' in if_expr:
+            # if OR, multiple actions can be in the disjunction, will all have the same dynamics
+            idxs = set()
+            action_dynamics = []
+            sub_exprs = if_expr['logic_or']
+            for i, sub_expr in enumerate(sub_exprs):
+                # tries to get action-conditioned dynamics for sub-expr
+                dyn = self._extract_action_dynamics(
+                    {'if': sub_expr, True: expression[True], False: expression[False]})
+                for k in dyn.keys():
+                    # gets action-conditioned dynamics only
+                    if isinstance(k, ActionSet):
+                        idxs.add(i)
+                        action_dynamics.append({k: dyn[k]})
+            if len(action_dynamics) == 0:
+                # expression is not action-conditioned
                 return dynamics
+
+            # set True branch dynamics to actions, remove them from disjunction and set dynamics to world
+            or_expr = tuple(sub_expr for i, sub_expr in enumerate(sub_exprs) if i not in idxs)
+            dynamics = {}
+            for dyn in action_dynamics:
+                dynamics.update(dyn)  # add action-conditioned dynamics
+            if len(or_expr) > 0:
+                # set remaining "if" dynamics to world
+                dynamics[True] = {'if': {'logic_or': or_expr}, True: expression[True], False: expression[False]}
+            else:
+                dynamics.update(self._extract_action_dynamics(expression[False]))  # process False branch
+            return dynamics
 
         return dynamics
 
@@ -178,7 +187,8 @@ class _DynamicsConverter(_ExpressionConverter):
             if isinstance(expr['if'], dict) and len(expr['if']) == 1:
                 return self._get_decision_tree(self._get_if_tree(expr['if'], expr[True], expr[False]), leaf_func)
 
-            assert isinstance(expr['if'], KeyedPlane), f'Could not parse RDDL expression, got invalid branch: "{expr}"!'
+            assert isinstance(expr['if'], KeyedPlane), \
+                f'Could not parse RDDL expression, got invalid branch: "{expr["if"]}"!'
 
             # otherwise just create a PsychSim decision tree
             tree = {child: self._get_decision_tree(expr[child], leaf_func) for child in expr if child != 'if'}
