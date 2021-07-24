@@ -333,6 +333,51 @@ class TestConstraints(unittest.TestCase):
             else:
                 self.assertNotIn(a, legal_acts)
 
+    def test_actions_param_legal_ma(self):
+        agents = {'John': 1.22, 'Paul': 3.75, 'George': -1.14, 'Ringo': 4.73}
+        objs = {'x1': True, 'x2': False, 'x3': False, 'x4': True}
+        rddl = f'''
+                domain my_test {{
+                    types {{ agent : object; obj: object; }};
+                    pvariables {{ 
+                        p(obj, agent) : {{ state-fluent, real, default = 0 }};
+                        q(obj) : {{ state-fluent, bool, default = True }};
+                        a(obj, agent) : {{ action-fluent, bool, default = false }}; 
+                    }};
+                    cpfs {{ p'(?o, ?a) = p(?o, ?a); }};
+                    reward = 0;
+                    state-action-constraints {{ forall_{{?o: obj, ?a: agent}}[ a(?o, ?a) => q(?o) ]; }}; 
+                }}
+                non-fluents my_test_nf {{ 
+                    domain = my_test; 
+                    objects {{ 
+                        agent : {{{', '.join(agents.keys())}}}; 
+                        obj : {{{', '.join(objs.keys())}}};
+                    }};
+                }}
+                instance my_test_inst {{ 
+                    domain = my_test; 
+                    init-state {{ 
+                        {'; '.join(f'p({o},{a})={v if l else -1}' for a, v in agents.items() for o, l in objs.items())};
+                        {'; '.join(f'q({o})={str(v).lower()}' for o, v in objs.items())};  
+                    }}; 
+                    horizon  = 0;
+                }}
+                '''
+        conv = Converter(const_as_assert=True)
+        conv.convert_str(rddl)
+        conv.world.step()
+        for ag_name, val in agents.items():
+            legal_acts = conv.world.agents[ag_name].getLegalActions()
+            for obj_name, legal in objs.items():
+                p = conv.world.getState(ag_name, Converter.get_feature_name(('p', obj_name)), unique=True)
+                self.assertEqual(p, val if legal else -1)
+                a = conv.actions[ag_name][Converter.get_feature_name(('a', obj_name, ag_name))]
+                if legal:
+                    self.assertIn(a, legal_acts)
+                else:
+                    self.assertNotIn(a, legal_acts)
+
     def test_actions_param_legal_logic(self):
         objs = {'x1': True, 'x2': False, 'x3': False, 'x4': True}
         rddl = f'''

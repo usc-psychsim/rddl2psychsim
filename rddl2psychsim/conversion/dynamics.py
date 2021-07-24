@@ -67,30 +67,36 @@ class _DynamicsConverter(_ExpressionConverter):
     def _create_dynamics(self, key: str, expression: Expression,
                          param_map: Dict[str, str] or None = None,
                          dependencies: Set[str] = None) -> None:
+
+        def _is_self_dyn(dyn_expr):
+            return _is_linear_function(dyn_expr) and len(dyn_expr) == 1 and key in dyn_expr and dyn_expr[key] == 1
+
         # tries to get actions responsible for feature update from expression
         expr = self._convert_expression(expression, param_map, dependencies)
         action_dynamics = self._extract_action_dynamics(expr)
 
         # for each sub-expression, set dynamics for feature as provided by an action (or the world itself)
         for action, dyn_expr in action_dynamics.items():
+            if _is_self_dyn(dyn_expr):
+                continue  # ignore dynamics would not change variable
             tree = self._get_dynamics_tree(key, dyn_expr)
             self.world.setDynamics(key, action, tree)
             logging.info(f'Set dynamics for feature "{key}" associated with "{action}" to:\n{tree}')
 
     def _extract_action_dynamics(self, expression: Dict) -> Dict[ActionSet or bool, Dict]:
 
-        def _get_act_disjunction(expr):
+        def _is_action_dynamics(expr):
             if 'action' in expr:
                 _, action, _ = expr['action']  # add to list of actions
                 actions.add(action)
                 return True
-            if 'logic_or' in expr:
-                return all(_get_act_disjunction(sub_expr) for sub_expr in expr['logic_or'])
+            if 'logic_or' in expr:  # tries to match "exists_x( action (x) )", ie "action(x1) | action(x2) | ... "
+                return all(_is_action_dynamics(sub_expr) for sub_expr in expr['logic_or'])
             return False  # top expression is not a disjunction of actions
 
         # check if we can pull actions from the sub-expressions in the form "if (action [or action...]) then dyn_expr"
         actions = set()
-        if 'if' in expression and _get_act_disjunction(expression['if']):
+        if 'if' in expression and _is_action_dynamics(expression['if']):
             # assigns dynamics to actions and processes rest of expression
             dynamics = {action: expression[True] for action in actions}
             dynamics.update(self._extract_action_dynamics(expression[False]))
