@@ -1,7 +1,7 @@
 import math
 import itertools as it
 import numpy as np
-from typing import Dict, Union, List, Set
+from typing import Dict, Union, List, Set, Any
 from pyrddl.expr import Expression
 from psychsim.pwl import CONSTANT, makeFuture
 from rddl2psychsim.conversion import _ConverterBase
@@ -87,6 +87,43 @@ def _get_const_val(expr: Dict, c_type: type = None) -> Union[float, None]:
         return None
     except ValueError:
         return None
+
+
+def _propagate_switch_expr(op: str, *args: Dict[str, Any]) -> Dict:
+    """
+    Propagates a binary expression to the leaves of a switch expression.
+    For example, "switch(...){case a: expr_a, ... } > 1" is transformed to "switch(...){case a: expr_a > 1, ...}"
+    :param str op: the outer operation to be propagated to the switch case children expressions.
+    :param dict[str] args: the arguments for the outer operation, one of which is a switch expression.
+    :rtype: dict
+    :return: a switch expression in which the outer operation was propagated through its leaf (child) expressions.
+    """
+    switch_arg = None
+    switch_idx = -1
+    new_args = []
+    for i, arg in enumerate(args):
+        if 'switch' in arg:
+            if switch_arg is not None:
+                # if we already have a switch arg, then choose "longest" one first (smaller resulting tree)
+                if len(arg['switch'][1]) <= len(switch_arg['switch'][1]):
+                    new_args.append(arg)  # ignore this switch if "shorter" than existing one
+                    continue
+                else:
+                    new_args[switch_idx] = args[switch_idx]  # replace with "longer" switch
+            switch_arg = arg
+            switch_idx = i
+            new_args.append(None)  # placeholder to replace child
+        else:
+            new_args.append(arg)
+    if switch_arg is None:
+        return {op: tuple(args)}
+    switch_arg, case_values, case_children = switch_arg['switch']
+    new_case_children = []
+    for case_child in case_children:  # case child used as branch for the if subtree
+        op_args = new_args.copy()
+        op_args[switch_idx] = case_child
+        new_case_children.append({op: tuple(op_args) if len(op_args) > 1 else op_args[0]})
+    return {'switch': (switch_arg, case_values, new_case_children)}
 
 
 class _ExpressionConverter(_ConverterBase):
@@ -266,8 +303,10 @@ class _ExpressionConverter(_ConverterBase):
         lhs_const = _get_const_val(lhs, float)
         rhs_const = _get_const_val(rhs, float) if rhs is not None else None
         all_consts = lhs_const is not None and rhs_const is not None
-        a_type = expression.etype[1]
+        lhs_switch = 'switch' in lhs
+        rhs_switch = 'switch' in rhs
 
+        a_type = expression.etype[1]
         if a_type == '+':
             if all_consts:
                 return {CONSTANT: lhs_const + rhs_const}  # reduce
@@ -319,6 +358,8 @@ class _ExpressionConverter(_ConverterBase):
         lhs_const = _get_const_val(lhs, bool)
         rhs_const = _get_const_val(rhs, bool)
         all_consts = lhs_const is not None and rhs_const is not None
+        lhs_switch = 'switch' in lhs
+        rhs_switch = 'switch' in rhs
 
         b_type = expression.etype[1]
         if b_type == '^':
@@ -345,6 +386,8 @@ class _ExpressionConverter(_ConverterBase):
             if _is_linear_function(lhs) and _is_linear_function(rhs):
                 # if both linear ops, just add everything from both sides (thresh >= len)
                 return {'linear_and': _combine_linear_functions(lhs, rhs)}
+            if lhs_switch or rhs_switch:
+                return _propagate_switch_expr('logic_and', lhs, rhs)  # propagate expr switch children
             return {'logic_and': (orig_lhs, orig_rhs)}  # AND tree
 
         if b_type == '|':
@@ -371,6 +414,8 @@ class _ExpressionConverter(_ConverterBase):
             if _is_linear_function(lhs) and _is_linear_function(rhs):
                 # if both vectors, just add everything from both sides (thresh > 0)
                 return {'linear_or': _combine_linear_functions(lhs, rhs)}
+            if lhs_switch or rhs_switch:
+                return _propagate_switch_expr('logic_or', lhs, rhs)  # propagate expr to switch children
             return {'logic_or': (orig_lhs, orig_rhs)}  # OR tree
 
         if b_type == '~':
@@ -383,6 +428,8 @@ class _ExpressionConverter(_ConverterBase):
                 return {'linear_or': _negate_linear_function(lhs['linear_and'])}
             if 'linear_or' in lhs and len(lhs) == 1:  # ~(A | B) <=> ~A ^ ~B
                 return {'linear_and': _negate_linear_function(lhs['linear_or'])}
+            if lhs_switch or rhs_switch:
+                return _propagate_switch_expr('not', lhs)  # propagate expression to switch children
             return {'not': lhs}  # defer for later processing
 
         if b_type == '<=>':
@@ -391,6 +438,8 @@ class _ExpressionConverter(_ConverterBase):
                 return {CONSTANT: rhs_const == lhs_const}  # equal booleans
             if rhs == lhs:  # equal dicts
                 return {CONSTANT: True}
+            if lhs_switch or rhs_switch:
+                return _propagate_switch_expr('equiv', lhs, rhs)  # propagate expression to switch children
             return {'equiv': (lhs, rhs)}  # defer for later processing
 
         if b_type == '=>':
@@ -408,6 +457,8 @@ class _ExpressionConverter(_ConverterBase):
                 if rhs_const:
                     return {CONSTANT: True}  # right is true, so implication is true
                 return {'not': lhs}  # right is false, negate left
+            if lhs_switch or rhs_switch:
+                return _propagate_switch_expr('imply', lhs, rhs)  # propagate expression to switch children
             return {'imply': (lhs, rhs)}  # defer for later processing
 
         raise NotImplementedError(f'Cannot parse boolean expression: "{expression_to_rddl(expression)}",'
@@ -421,6 +472,8 @@ class _ExpressionConverter(_ConverterBase):
         lhs_const = _get_const_val(lhs)
         rhs_const = _get_const_val(rhs)
         all_consts = lhs_const is not None and rhs_const is not None
+        lhs_switch = 'switch' in lhs
+        rhs_switch = 'switch' in rhs
 
         b_type = expression.etype[1]
         if b_type == '==':
@@ -429,6 +482,8 @@ class _ExpressionConverter(_ConverterBase):
                 return {CONSTANT: lhs_const == rhs_const}
             if rhs == lhs:  # equal dicts
                 return {CONSTANT: True}
+            if lhs_switch or rhs_switch:
+                return _propagate_switch_expr('eq', lhs, rhs)  # propagate expression to switch children
 
             # left and right have to be linear funcs
             assert (_is_linear_function(lhs) or self._is_constant_expr(lhs)) and \
@@ -443,6 +498,8 @@ class _ExpressionConverter(_ConverterBase):
                 return {CONSTANT: lhs_const != rhs_const}
             if rhs == lhs:  # equal dicts, so not different
                 return {CONSTANT: False}
+            if lhs_switch or rhs_switch:
+                return _propagate_switch_expr('neq', lhs, rhs)  # propagate expression to switch children
 
             # left and right have to be linear funcs
             assert (_is_linear_function(lhs) or self._is_constant_expr(lhs)) and \
@@ -457,6 +514,8 @@ class _ExpressionConverter(_ConverterBase):
                 return {CONSTANT: lhs_const > rhs_const}
             if rhs == lhs:  # equal dicts, so not different
                 return {CONSTANT: False}
+            if lhs_switch or rhs_switch:
+                return _propagate_switch_expr('gt', lhs, rhs)  # propagate expression to switch children
 
             # left and right have to be linear funcs
             assert (_is_linear_function(lhs) or self._is_constant_expr(lhs)) and \
@@ -471,6 +530,8 @@ class _ExpressionConverter(_ConverterBase):
                 return {CONSTANT: lhs_const < rhs_const}
             if rhs == lhs:  # equal dicts, so not different
                 return {CONSTANT: False}
+            if lhs_switch or rhs_switch:
+                return _propagate_switch_expr('lt', lhs, rhs)  # propagate expression to switch children
 
             # left and right have to be linear funcs
             assert (_is_linear_function(lhs) or self._is_constant_expr(lhs)) and \
@@ -485,6 +546,8 @@ class _ExpressionConverter(_ConverterBase):
                 return {CONSTANT: lhs_const >= rhs_const}
             if rhs == lhs:  # equal dicts
                 return {CONSTANT: True}
+            if lhs_switch or rhs_switch:
+                return _propagate_switch_expr('geq', lhs, rhs)  # propagate expression to switch children
 
             # left and right have to be linear funcs
             assert (_is_linear_function(lhs) or self._is_constant_expr(lhs)) and \
@@ -499,7 +562,8 @@ class _ExpressionConverter(_ConverterBase):
                 return {CONSTANT: lhs_const <= rhs_const}
             if rhs == lhs:  # equal dicts
                 return {CONSTANT: True}
-
+            if lhs_switch or rhs_switch:
+                return _propagate_switch_expr('leq', lhs, rhs)  # propagate expression to switch children
             # left and right have to be linear funcs
             assert (_is_linear_function(lhs) or self._is_constant_expr(lhs)) and \
                    (_is_linear_function(rhs) or self._is_constant_expr(rhs)), \
