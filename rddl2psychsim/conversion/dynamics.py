@@ -314,7 +314,7 @@ class _DynamicsConverter(_ExpressionConverter):
     def _get_plane(self, expr: Dict, negate: bool = False) -> Tuple[KeyedPlane or None, bool]:
         # signature: KeyedPlane(KeyedVector(weights), threshold, comparison)
 
-        if 'not' in expr and len(expr) == 1:
+        if 'not' in expr:
             # if NOT, get negated operation
             return self._get_plane(expr['not'], not negate)
 
@@ -322,9 +322,8 @@ class _DynamicsConverter(_ExpressionConverter):
             # assumes linear combination of all features in vector has to be > 0.5,
             # which is truth value in PsychSim (see psychsim.world.World.float2value)
             if negate:
-                return KeyedPlane(KeyedVector(expr), 0.5 + EPS, -1), False
-            else:
-                return KeyedPlane(KeyedVector(expr), 0.5, 1), False
+                expr = _negate_linear_function(expr)
+            return KeyedPlane(KeyedVector(expr), 0.5 if any(v > 0 for v in expr.values()) else -0.5, 1), False
 
         if 'action' in expr and len(expr['action']) == 3:
             # conditional on specific agent's action (agent's action == the action)
