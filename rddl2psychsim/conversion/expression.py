@@ -778,8 +778,8 @@ class _ExpressionConverter(_ConverterBase):
             if len(sub_exprs) == 0:  # if nothing to check, forall is True
                 return {CONSTANT: True}
             if len(sub_exprs) == 1 or all(s == sub_exprs[0] for s in sub_exprs[1:]):
-                # if only one expression in forall, then just return it's truth value
-                return {'if': sub_exprs[0], True: {CONSTANT: True}, False: {CONSTANT: False}}
+                # if only one expression in forall, then just return it
+                return sub_exprs[0]
 
             # if all linear ops, just add everything (thresh >= len)
             if all(_is_linear_function(expr) for expr in sub_exprs):
@@ -816,8 +816,8 @@ class _ExpressionConverter(_ConverterBase):
             if len(sub_exprs) == 0:  # if nothing to check, exists is False
                 return {CONSTANT: False}
             if len(sub_exprs) == 1 or all(s == sub_exprs[0] for s in sub_exprs[1:]):
-                # if only one expression in forall, then just return it's truth value
-                return {'if': sub_exprs[0], True: {CONSTANT: True}, False: {CONSTANT: False}}
+                # if only one expression in forall, then just return it
+                return sub_exprs[0]
 
             # if all linear ops, just add everything (linear OR)
             if all(_is_linear_function(expr) for expr in sub_exprs):
