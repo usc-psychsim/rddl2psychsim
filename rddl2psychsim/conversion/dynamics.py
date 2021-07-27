@@ -122,7 +122,8 @@ class _DynamicsConverter(_ExpressionConverter):
             # if only one action in conjunction, remove it from conjunction and set its dynamics
             and_expr = tuple(sub_expr for i, sub_expr in enumerate(sub_exprs) if i != action_idx)
             dynamics = self._extract_action_dynamics(expression[False])
-            return {action: {'if': {'logic_and': and_expr}, True: expression[True], False: dynamics[True]}}
+            return {action: {'if': {'logic_and': and_expr}, True: expression[True], False: dynamics[True]},
+                    **dynamics}
 
         if 'logic_or' in if_expr:
             # if OR, multiple actions can be in the disjunction, will all have the same dynamics

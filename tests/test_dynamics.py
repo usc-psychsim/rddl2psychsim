@@ -289,9 +289,9 @@ class TestDynamics(unittest.TestCase):
         conv = Converter()
         conv.convert_str(rddl)
         self.assertIn(stateKey(WORLD, 'p'), conv.world.dynamics)
-        self.assertEqual(len(conv.world.dynamics[stateKey(WORLD, 'p')]), 1)  # action only
-        self.assertNotIn(True, conv.world.dynamics[stateKey(WORLD, 'p')])
-        self.assertNotIn(True, conv.world.dynamics)
+        self.assertEqual(len(conv.world.dynamics[stateKey(WORLD, 'p')]), 2)  # action + world
+        self.assertIn(True, conv.world.dynamics[stateKey(WORLD, 'p')])
+        self.assertIn(True, conv.world.dynamics)
         action = next(iter(next(iter(conv.world.agents.values())).actions))
         self.assertIn(action, conv.world.dynamics[stateKey(WORLD, 'p')])
         self.assertEqual(len(conv.world.dynamics[action]), 1)
@@ -321,7 +321,7 @@ class TestDynamics(unittest.TestCase):
         conv = Converter()
         conv.convert_str(rddl)
         self.assertIn(stateKey(WORLD, 'p'), conv.world.dynamics)
-        self.assertEqual(len(conv.world.dynamics[stateKey(WORLD, 'p')]), 3)  # 2 action + True
+        self.assertEqual(len(conv.world.dynamics[stateKey(WORLD, 'p')]), 3)  # 2 actions + True
         self.assertIn(True, conv.world.dynamics[stateKey(WORLD, 'p')])
         self.assertEqual(len(conv.world.dynamics[True]), 1)
         for action in next(iter(conv.world.agents.values())).actions:
@@ -348,8 +348,7 @@ class TestDynamics(unittest.TestCase):
                 }
                 non-fluents my_test_empty { 
                     domain = my_test; 
-                    // objects { agent: { Paul, John, George, Ringo }; };
-                    objects { agent: { Paul, John }; };
+                    objects { agent: { Paul, John, George, Ringo }; };
                  }
                 instance my_test_inst { domain = my_test; init-state { p = 0; }; horizon  = 2; }
                 '''
