@@ -457,8 +457,6 @@ class _ExpressionConverter(_ConverterBase):
                 if rhs_const:
                     return {CONSTANT: True}  # right is true, so implication is true
                 return {'not': lhs}  # right is false, negate left
-            if lhs_switch or rhs_switch:
-                return _propagate_switch_expr('imply', lhs, rhs)  # propagate expression to switch children
             return {'imply': (lhs, rhs)}  # defer for later processing
 
         raise NotImplementedError(f'Cannot parse boolean expression: "{expression_to_rddl(expression)}",'
