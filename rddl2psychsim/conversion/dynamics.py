@@ -223,14 +223,16 @@ class _DynamicsConverter(_ExpressionConverter):
 
         # otherwise we have to build (possibly nested) PWL trees
         if 'logic_and' in branch:
-            # negation, ~(A ^ B ^ ...) <= > ~A | ~B | ...
+            # negate to have disjunction, ~(A ^ B ^ ...) <= > ~A | ~B | ...
             return self._get_if_tree({'logic_or': [{'not': sub_expr} for sub_expr in branch['logic_and']]},
                                      false_child,
                                      true_child)
 
         if 'logic_or' in branch:
             sub_exprs = branch['logic_or']
-            assert len(sub_exprs) > 1, f'Could not parse RDDL expression, OR needs at least two arguments "{branch}"!'
+            if len(sub_exprs) == 1:  # check OR of only one element
+                return self._get_if_tree(sub_exprs[0], true_child, false_child)
+            # otherwise builds nested OR tree
             lhs = sub_exprs[0]
             rhs = {'logic_or': sub_exprs[1:]} if len(sub_exprs) > 2 else sub_exprs[1]
             return self._get_if_tree(lhs,
@@ -356,10 +358,13 @@ class _DynamicsConverter(_ExpressionConverter):
                 return KeyedPlane(KeyedVector(expr), sum([v for v in expr.values() if v > 0]) - 0.5 + EPS, -1), False
 
         if 'logic_and' in expr and len(expr) == 1:
-            # negation, ~(A ^ B ^ ...) <= > ~A | ~B | ...
+            # negate to try to have disjunction: ~(A ^ B ^ ...) <= > ~A | ~B | ...
             return self._get_plane({'logic_or': [{'not': sub_expr} for sub_expr in expr['logic_and']]}, not negate)
 
         if 'logic_or' in expr and len(expr) == 1:
+            if len(expr['logic_or']) == 1:  # check disjunction of only one element
+                return self._get_plane(expr['logic_or'][0], negate)
+
             # get disjunction between sub-expressions (all planes must be valid)
             # for negation, ~(A | B | ...) <=> ~A ^ ~B ^ ...
             sub_exprs = expr['logic_or']
