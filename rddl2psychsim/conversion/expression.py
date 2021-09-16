@@ -1,6 +1,7 @@
 import math
 import itertools as it
 import numpy as np
+from functools import reduce
 from typing import Dict, Union, List, Set, Any
 from pyrddl.expr import Expression
 from psychsim.pwl import CONSTANT, makeFuture
@@ -762,7 +763,7 @@ class _ExpressionConverter(_ConverterBase):
             for p_map in param_maps:
                 sub_exprs.append(self._convert_expression(expression.args[-1], {**param_map, **p_map}, dependencies))
 
-            # filter sub-expressions
+            # filter constant sub-expressions
             filtered_sub_exprs = []
             for i, expr in enumerate(sub_exprs):
                 const_val = _get_const_val(expr, bool)
@@ -781,9 +782,7 @@ class _ExpressionConverter(_ConverterBase):
 
             # if all linear ops, just add everything (thresh >= len)
             if all(_is_linear_function(expr) for expr in sub_exprs):
-                lf = {}
-                for expr in sub_exprs:
-                    lf = _combine_linear_functions(lf, expr)  # sum linear functions
+                lf = reduce(lambda e1, e2: _combine_linear_functions(e1, e2), sub_exprs)  # sum linear functions
                 return {CONSTANT: False} if len(lf) == 0 else {'linear_and': lf}
 
             # otherwise build AND plane conjunction
@@ -800,7 +799,7 @@ class _ExpressionConverter(_ConverterBase):
             for p_map in param_maps:
                 sub_exprs.append(self._convert_expression(expression.args[-1], {**param_map, **p_map}, dependencies))
 
-            # filter sub-expressions
+            # filter constant sub-expressions
             filtered_sub_exprs = []
             for i, expr in enumerate(sub_exprs):
                 const_val = _get_const_val(expr, bool)
@@ -814,14 +813,12 @@ class _ExpressionConverter(_ConverterBase):
             if len(sub_exprs) == 0:  # if nothing to check, exists is False
                 return {CONSTANT: False}
             if len(sub_exprs) == 1 or all(s == sub_exprs[0] for s in sub_exprs[1:]):
-                # if only one expression in forall, then just return it
+                # if only one expression in exists, then just return it
                 return sub_exprs[0]
 
             # if all linear ops, just add everything (linear OR)
             if all(_is_linear_function(expr) for expr in sub_exprs):
-                lf = {}
-                for expr in sub_exprs:
-                    lf = _combine_linear_functions(lf, expr)  # sum linear functions
+                lf = reduce(lambda e1, e2: _combine_linear_functions(e1, e2), sub_exprs)  # sum linear functions
                 return {CONSTANT: False} if len(lf) == 0 else {'linear_or': lf}
 
             # otherwise build nested OR plane disjunction
