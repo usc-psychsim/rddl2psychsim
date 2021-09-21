@@ -387,9 +387,20 @@ class _ExpressionConverter(_ConverterBase):
             if _is_linear_function(lhs) and _is_linear_function(rhs):
                 # if both linear ops, just add everything from both sides (thresh >= len)
                 return {'linear_and': _combine_linear_functions(lhs, rhs)}
+            or_lst = []
+            if 'logic_and' in lhs and len(lhs) == 1:
+                or_lst.extend(lhs['logic_and'])  # tries to combine several AND together
+            else:
+                or_lst.append(lhs)
+            if 'logic_and' in rhs and len(rhs) == 1:
+                or_lst.extend(rhs['logic_and'])  # tries to combine several AND together
+            else:
+                or_lst.append(rhs)
+            if len(or_lst) > 2:
+                return {'logic_and': or_lst}
             if lhs_switch or rhs_switch:
                 return _propagate_switch_expr('logic_and', lhs, rhs)  # propagate expr switch children
-            return {'logic_and': (orig_lhs, orig_rhs)}  # AND tree
+            return {'logic_and': [orig_lhs, orig_rhs]}  # AND tree
 
         if b_type == '|':
             # if OR, one side has to be True
@@ -415,9 +426,20 @@ class _ExpressionConverter(_ConverterBase):
             if _is_linear_function(lhs) and _is_linear_function(rhs):
                 # if both vectors, just add everything from both sides (thresh > 0)
                 return {'linear_or': _combine_linear_functions(lhs, rhs)}
+            or_lst = []
+            if 'logic_or' in lhs and len(lhs) == 1:
+                or_lst.extend(lhs['logic_or'])  # tries to combine several AND together
+            else:
+                or_lst.append(lhs)
+            if 'logic_or' in rhs and len(rhs) == 1:
+                or_lst.extend(rhs['logic_or'])  # tries to combine several AND together
+            else:
+                or_lst.append(rhs)
+            if len(or_lst) > 2:
+                return {'logic_or': or_lst}
             if lhs_switch or rhs_switch:
                 return _propagate_switch_expr('logic_or', lhs, rhs)  # propagate expr to switch children
-            return {'logic_or': (orig_lhs, orig_rhs)}  # OR tree
+            return {'logic_or': [orig_lhs, orig_rhs]}  # OR tree
 
         if b_type == '~':
             # NOT
@@ -590,25 +612,25 @@ class _ExpressionConverter(_ConverterBase):
             assert len(expression.args) > 1, f'Cannot parse switch expression: "{expression_to_rddl(expression)}", ' \
                                              f'no cases provided!'
 
-            # get expression for terminal condition, has to be PWL
+            # get expression for condition, has to be PWL
             cond = self._convert_expression(expression.args[0], param_map, dependencies)
             assert _is_linear_function(cond), \
                 f'Cannot parse switch expression: "{expression_to_rddl(expression)}", switch condition is not PWL!'
 
             # get expressions for each of the branches
             case_values = []
-            case_branches = []
+            case_exprs = []
             for arg in expression.args[1:]:
                 case_type = arg[0]
                 if case_type == 'case':
                     val = self._convert_expression(arg[1][0], param_map, dependencies)
-                    branch = self._convert_expression(arg[1][1], param_map, dependencies)
+                    expr = self._convert_expression(arg[1][1], param_map, dependencies)
                 elif case_type == 'default':
                     assert 'default' not in case_values, \
                         f'Cannot parse switch expression: "{expression_to_rddl(expression)}", ' \
                         f'default branch defined more than once!'
                     val = 'default'
-                    branch = self._convert_expression(arg[1], param_map, dependencies)
+                    expr = self._convert_expression(arg[1], param_map, dependencies)
                 else:
                     raise ValueError(f'Cannot parse switch expression: "{expression_to_rddl(expression)}", '
                                      f'unknown case type: "{case_type}"!')
@@ -616,11 +638,11 @@ class _ExpressionConverter(_ConverterBase):
                 assert val == 'default' or _is_linear_function(val) or self._is_constant_expr(val), \
                     f'Cannot parse switch expression: "{expression_to_rddl(expression)}", case condition is not PWL!'
                 case_values.append(val)
-                case_branches.append(branch)
+                case_exprs.append(expr)
 
             assert 'default' in case_values, \
                 f'Cannot parse switch expression: "{expression_to_rddl(expression)}", missing default branch!'
-            return {'switch': (cond, case_values, case_branches)}
+            return {'switch': (cond, case_values, case_exprs)}
 
         raise NotImplementedError(f'Cannot parse control expression: "{expression_to_rddl(expression)}",'
                                   f'cannot handle type "{c_type}"!')
@@ -732,8 +754,8 @@ class _ExpressionConverter(_ConverterBase):
             param_maps = self._get_param_mappings(expression)
             lf = {}
             for p_map in param_maps:
-                expr = self._convert_expression(expression.args[-1], {**param_map, **p_map}, dependencies)
-                lf = _combine_linear_functions(lf, expr)  # sum linear functions
+                sub_expr = self._convert_expression(expression.args[-1], {**param_map, **p_map}, dependencies)
+                lf = _combine_linear_functions(lf, sub_expr)  # sum linear functions
             return {CONSTANT: 0} if len(lf) == 0 else lf
 
         if d_type == 'prod':
@@ -744,11 +766,11 @@ class _ExpressionConverter(_ConverterBase):
             param_maps = self._get_param_mappings(expression)
             lf = {CONSTANT: 1.}
             for p_map in param_maps:
-                expr = self._convert_expression(expression.args[-1], {**param_map, **p_map}, dependencies)
-                const_val = _get_const_val(expr, float)
+                sub_expr = self._convert_expression(expression.args[-1], {**param_map, **p_map}, dependencies)
+                const_val = _get_const_val(sub_expr, float)
                 assert const_val is not None, \
                     f'Cannot parse aggregation expression: "{expression_to_rddl(expression)}", ' \
-                    f'non-constant expression: "{expr}"!'
+                    f'non-constant expression: "{sub_expr}"!'
                 lf = _scale_linear_function(lf, const_val)  # product of constant values
             return {CONSTANT: 0} if len(lf) == 0 else lf
 
@@ -765,10 +787,10 @@ class _ExpressionConverter(_ConverterBase):
 
             # filter constant sub-expressions
             filtered_sub_exprs = []
-            for i, expr in enumerate(sub_exprs):
-                const_val = _get_const_val(expr, bool)
+            for j, sub_expr in enumerate(sub_exprs):
+                const_val = _get_const_val(sub_expr, bool)
                 if const_val is None:
-                    filtered_sub_exprs.append(expr)
+                    filtered_sub_exprs.append(sub_expr)
                 elif not const_val:  # check False constant, then forall is False
                     return {CONSTANT: False}
                 # otherwise got True constant, then does not affect forall
@@ -801,10 +823,10 @@ class _ExpressionConverter(_ConverterBase):
 
             # filter constant sub-expressions
             filtered_sub_exprs = []
-            for i, expr in enumerate(sub_exprs):
-                const_val = _get_const_val(expr, bool)
+            for j, sub_expr in enumerate(sub_exprs):
+                const_val = _get_const_val(sub_expr, bool)
                 if const_val is None:
-                    filtered_sub_exprs.append(expr)
+                    filtered_sub_exprs.append(sub_expr)
                 elif const_val:  # check True constant, then exists is True
                     return {CONSTANT: True}
                 # otherwise got False constant, then does not affect exists
@@ -821,8 +843,8 @@ class _ExpressionConverter(_ConverterBase):
                 lf = reduce(lambda e1, e2: _combine_linear_functions(e1, e2), sub_exprs)  # sum linear functions
                 return {CONSTANT: False} if len(lf) == 0 else {'linear_or': lf}
 
-            # otherwise build nested OR plane disjunction
-            return {'logic_or': sub_exprs}
+            # build OR plane disjunction
+            return {'logic_or': sub_exprs} if len(sub_exprs) > 0 else sub_exprs[0]
 
         raise NotImplementedError(f'Cannot parse aggregation expression: "{expression_to_rddl(expression)}",'
                                   f'cannot handle type "{d_type}"!')
