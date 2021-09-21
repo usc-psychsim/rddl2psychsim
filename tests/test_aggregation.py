@@ -614,7 +614,42 @@ class TestAggregation(unittest.TestCase):
         p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
 
-    def test_fluent_forall_rel(self):
+    def test_forall_multi_param(self):
+        objs = {('x1', 'y1'): True, ('x1', 'y2'): True, ('x2', 'y1'): True, ('x2', 'y2'): True}
+        rddl = f'''
+                domain my_test {{
+                    types {{ obj1 : object; obj2 : object; }};
+                    pvariables {{ 
+                        p : {{ state-fluent, bool, default = false }};
+                        q(obj1, obj2) : {{ state-fluent, bool, default = false }};
+                        a : {{ action-fluent, bool, default = false }}; 
+                    }};
+                    cpfs {{ p' = forall_{{?x : obj1, ?y : obj2}}[ q(?x,?y) ]; }}; 
+                    reward = 0;
+                }}
+                non-fluents my_test_nf {{ 
+                    domain = my_test; 
+                    objects {{
+                        obj1 : {{{', '.join(set(obj[0] for obj in objs.keys()))}}};
+                        obj2 : {{{', '.join(set(obj[1] for obj in objs.keys()))}}};
+                    }};
+                }}
+                instance my_test_inst {{ 
+                    domain = my_test; 
+                    init-state {{
+                        {'; '.join(f'q({o[0]},{o[1]})={str(v).lower()}' for o, v in objs.items())}; 
+                    }}; 
+                }}
+                '''
+        conv = Converter()
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p, False)
+        conv.world.step()
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p, all(objs.values()))
+
+    def test_forall_rel(self):
         objs = {'x1': 1, 'x2': 2, 'x3': 3, 'x4': 4}
         rddl = f'''
                 domain my_test {{
@@ -650,7 +685,7 @@ class TestAggregation(unittest.TestCase):
         p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, all(q >= 1 for q in objs.values()))
 
-    def test_fluent_forall_or(self):
+    def test_forall_or(self):
         objs = {'x1': 1, 'x2': 2, 'x3': 3, 'x4': 4}
         rddl = f'''
                 domain my_test {{
@@ -684,7 +719,7 @@ class TestAggregation(unittest.TestCase):
         p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, all(q >= 1 or p_ for q in objs.values()))
 
-    def test_fluent_forall_forall(self):
+    def test_forall_forall(self):
         objs = {('x1', 'y1'): 1,
                 ('x1', 'y2'): 2,
                 ('x2', 'y1'): 3,
@@ -730,7 +765,7 @@ class TestAggregation(unittest.TestCase):
                                     for y in set(y for _, y in objs.keys()))
                                 for x in set(x for x, _ in objs.keys())))
 
-    def test_fluent_forall_exists(self):
+    def test_forall_exists(self):
         objs = {('x1', 'y1'): 1,
                 ('x1', 'y2'): 3,
                 ('x2', 'y1'): 2,
@@ -775,7 +810,7 @@ class TestAggregation(unittest.TestCase):
                                     for y in set(y for _, y in objs.keys()))
                                 for x in set(x for x, _ in objs.keys())))
 
-    def test_fluent_forall_not_exists(self):
+    def test_forall_not_exists(self):
         objs = {('x1', 'y1'): 1,
                 ('x1', 'y2'): 3,
                 ('x2', 'y1'): 2,
@@ -821,7 +856,7 @@ class TestAggregation(unittest.TestCase):
                                         for y in set(y for _, y in objs.keys()))
                                 for x in set(x for x, _ in objs.keys())))
 
-    def test_fluent_forall_and(self):
+    def test_forall_and(self):
         objs = {'x1': 1, 'x2': 2, 'x3': 3, 'x4': 4}
         rddl = f'''
                 domain my_test {{
@@ -857,7 +892,7 @@ class TestAggregation(unittest.TestCase):
         p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, all(q >= 1 and p_ for q in objs.values()))
 
-    def test_invalid_fluent_forall_if(self):
+    def test_invalid_forall_if(self):
         objs = {'x1': 1, 'x2': 2, 'x3': 3, 'x4': 4}
         rddl = f'''
                 domain my_test {{
@@ -887,7 +922,7 @@ class TestAggregation(unittest.TestCase):
         with self.assertRaises(ValueError):
             conv.convert_str(rddl)
 
-    def test_fluent_exists_self(self):
+    def test_exists_self(self):
         objs = {'x1': True, 'x2': True, 'x3': True, 'x4': True}
         rddl = f'''
                 domain my_test {{
@@ -921,7 +956,7 @@ class TestAggregation(unittest.TestCase):
         p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, True)
 
-    def test_fluent_exists_true(self):
+    def test_exists_true(self):
         objs = {'x1': False, 'x2': False, 'x3': True, 'x4': False}
         rddl = f'''
                 domain my_test {{
@@ -955,7 +990,7 @@ class TestAggregation(unittest.TestCase):
         p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, any(objs.values()))
 
-    def test_fluent_exists_false(self):
+    def test_exists_false(self):
         objs = {'x1': False, 'x2': False, 'x3': False, 'x4': False}
         rddl = f'''
                 domain my_test {{
@@ -989,7 +1024,7 @@ class TestAggregation(unittest.TestCase):
         p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, any(objs.values()))
 
-    def test_fluent_exists_num(self):
+    def test_exists_num(self):
         objs = {'x1': True, 'x2': True, 'x3': True, 'x4': True}
         rddl = f'''
                 domain my_test {{
@@ -1091,7 +1126,7 @@ class TestAggregation(unittest.TestCase):
         p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
 
-    def test_fluent_exists_rel(self):
+    def test_exists_rel(self):
         objs = {'x1': 1, 'x2': 2, 'x3': 3, 'x4': 4}
         rddl = f'''
                 domain my_test {{
@@ -1128,7 +1163,233 @@ class TestAggregation(unittest.TestCase):
         p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, any(q > 3 for q in objs.values()))
 
-    def test_fluent_exists_and(self):
+    def test_exists_multi_param(self):
+        objs = {('x1', 'y1'): False, ('x2', 'y2'): False, ('x3', 'y3'): True, ('x4', 'y4'): False}
+        rddl = f'''
+                domain my_test {{
+                    types {{ obj1 : object; obj2 : object; }};
+                    pvariables {{ 
+                        p : {{ state-fluent, bool, default = false }};
+                        q(obj1, obj2) : {{ state-fluent, bool, default = false }};
+                        a : {{ action-fluent, bool, default = false }}; 
+                    }};
+                    cpfs {{ p' = exists_{{?x : obj1, ?y : obj2}}[ q(?x,?y) ]; }}; 
+                    reward = 0;
+                }}
+                non-fluents my_test_nf {{ 
+                    domain = my_test; 
+                    objects {{
+                        obj1 : {{{', '.join([obj[0] for obj in objs.keys()])}}};
+                        obj2 : {{{', '.join([obj[1] for obj in objs.keys()])}}};
+                    }};
+                }}
+                instance my_test_inst {{ 
+                    domain = my_test; 
+                    init-state {{
+                        {'; '.join(f'q({o[0]},{o[1]})={str(v).lower()}' for o, v in objs.items())}; 
+                    }}; 
+                }}
+                '''
+        conv = Converter()
+        conv.convert_str(rddl)
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p, False)
+        conv.world.step()
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p, any(objs.values()))
+
+    def test_exists_var_equals(self):
+        objs = ['x1', 'x2', 'x3', 'x4']
+        rddl = f'''
+                domain my_test {{
+                    types {{ obj : object; }};
+                    pvariables {{ 
+                        p : {{ state-fluent, bool, default = false }};
+                        q : {{ state-fluent, obj, default = none }};
+                        a : {{ action-fluent, bool, default = false }}; 
+                    }};
+                    cpfs {{ p' = exists_{{?x : obj}}[ q == ?x]; }}; 
+                    reward = 0;
+                }}
+                non-fluents my_test_nf {{ 
+                    domain = my_test; 
+                    objects {{
+                        obj : {{{', '.join(objs)}}};
+                    }};
+                }}
+                instance my_test_inst {{ 
+                    domain = my_test; 
+                    init-state {{ q={objs[2]};}}; 
+                }}
+                '''
+        conv = Converter()
+        conv.convert_str(rddl)
+        dyn = conv.world.getDynamics(stateKey(WORLD, 'p'), True)[0]
+        self.assertEqual(len(dyn.branch.planes), len(objs))  # disjunction over all values
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p, False)
+        conv.world.step()
+        q = conv.world.getState(WORLD, 'q', unique=True)
+        self.assertEqual(q, objs[2])
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p, True)
+
+    def test_exists_one_var_equals(self):
+        objs = ['x1']
+        rddl = f'''
+                domain my_test {{
+                    types {{ obj : object; }};
+                    pvariables {{ 
+                        p : {{ state-fluent, bool, default = false }};
+                        q : {{ state-fluent, obj, default = none }};
+                        a : {{ action-fluent, bool, default = false }}; 
+                    }};
+                    cpfs {{ p' = exists_{{?x : obj}}[ q == ?x]; }}; 
+                    reward = 0;
+                }}
+                non-fluents my_test_nf {{ 
+                    domain = my_test; 
+                    objects {{
+                        obj : {{{', '.join(objs)}}};
+                    }};
+                }}
+                instance my_test_inst {{ 
+                    domain = my_test; 
+                    init-state {{ q={objs[0]};}}; 
+                }}
+                '''
+        conv = Converter()
+        conv.convert_str(rddl)
+        dyn = conv.world.getDynamics(stateKey(WORLD, 'p'), True)[0]
+        self.assertNotIn(None, dyn.children)
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p, False)
+        conv.world.step()
+        q = conv.world.getState(WORLD, 'q', unique=True)
+        self.assertEqual(q, objs[0])
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p, True)
+
+    def test_exists_var_equals_and(self):
+        objs = ['x1', 'x2', 'x3', 'x4']
+        rddl = f'''
+                domain my_test {{
+                    types {{ obj : object; }};
+                    pvariables {{ 
+                        p : {{ state-fluent, bool, default = false }};
+                        q : {{ state-fluent, obj, default = none }};
+                        r : {{ state-fluent, int, default = 2 }};
+                        a : {{ action-fluent, bool, default = false }}; 
+                    }};
+                    cpfs {{ p' = exists_{{?x : obj}}[ ?x == q ^ r < 3]; }}; 
+                    reward = 0;
+                }}
+                non-fluents my_test_nf {{ 
+                    domain = my_test; 
+                    objects {{
+                        obj : {{{', '.join(objs)}}};
+                    }};
+                }}
+                instance my_test_inst {{ 
+                    domain = my_test; 
+                    init-state {{ q={objs[2]};}}; 
+                }}
+                '''
+        conv = Converter()
+        conv.convert_str(rddl)
+        dyn = conv.world.getDynamics(stateKey(WORLD, 'p'), True)[0]
+        self.assertEqual(len(dyn.branch.planes), 1)  # only one top comparison/branch
+        self.assertEqual(len(dyn.branch.planes[0][1]), len(objs))  # switch with branch for each value
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p, False)
+        conv.world.step()
+        q = conv.world.getState(WORLD, 'q', unique=True)
+        self.assertEqual(q, objs[2])
+        r = conv.world.getState(WORLD, 'r', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p, r < 3)
+
+    def test_exists_multi_param_var_equals(self):
+        objs_x = ['x1', 'x2']
+        objs_y = ['y1', 'y2', 'y3', 'y4']
+        rddl = f'''
+                domain my_test {{
+                    types {{ obj_x : object; obj_y : object; }};
+                    pvariables {{ 
+                        p : {{ state-fluent, bool, default = false }};
+                        q(obj_x) : {{ state-fluent, obj_y, default = none }};
+                        a : {{ action-fluent, bool, default = false }}; 
+                    }};
+                    cpfs {{ p' = exists_{{?x : obj_x, ?y : obj_y}}[ q(?x) == ?y ]; }}; 
+                    reward = 0;
+                }}
+                non-fluents my_test_nf {{ 
+                    domain = my_test; 
+                    objects {{
+                        obj_x : {{{', '.join(objs_x)}}};
+                        obj_y : {{{', '.join(objs_y)}}};
+                    }};
+                }}
+                instance my_test_inst {{ 
+                    domain = my_test; 
+                    init-state {{ q({objs_x[1]})={objs_y[2]};}}; 
+                }}
+                '''
+        conv = Converter()
+        conv.convert_str(rddl)
+        dyn = conv.world.getDynamics(stateKey(WORLD, 'p'), True)[0]
+        self.assertEqual(len(dyn.branch.planes), len(objs_x) * len(objs_y))  # disjunction over all combinations
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p, False)
+        conv.world.step()
+        q = conv.world.getState(WORLD, conv.get_feature_name(('q', objs_x[1])), unique=True)
+        self.assertEqual(q, objs_y[2])
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p, True)
+
+    def test_exists_multi_param_var_equals_and(self):
+        objs_x = ['x1', 'x2']
+        objs_y = ['y1', 'y2', 'y3', 'y4']
+        rddl = f'''
+                domain my_test {{
+                    types {{ obj_x : object; obj_y : object; }};
+                    pvariables {{ 
+                        p : {{ state-fluent, bool, default = false }};
+                        q(obj_x) : {{ state-fluent, obj_y, default = none }};
+                        r : {{ state-fluent, int, default = 2 }};
+                        a : {{ action-fluent, bool, default = false }}; 
+                    }};
+                    cpfs {{ p' = exists_{{?x : obj_x, ?y : obj_y}}[ q(?x) == ?y ^ r < 3]; }}; 
+                    reward = 0;
+                }}
+                non-fluents my_test_nf {{ 
+                    domain = my_test; 
+                    objects {{
+                        obj_x : {{{', '.join(objs_x)}}};
+                        obj_y : {{{', '.join(objs_y)}}};
+                    }};
+                }}
+                instance my_test_inst {{ 
+                    domain = my_test; 
+                    init-state {{ q({objs_x[1]})={objs_y[2]};}}; 
+                }}
+                '''
+        conv = Converter()
+        conv.convert_str(rddl)
+        dyn = conv.world.getDynamics(stateKey(WORLD, 'p'), True)[0]
+        self.assertEqual(len(dyn.branch.planes), 1)
+        self.assertEqual(len(dyn.branch.planes[0][1]), len(objs_y))  # switch over first x value
+        self.assertEqual(len(dyn.children[None].branch.planes), 1)
+        self.assertEqual(len(dyn.children[None].branch.planes[0][1]), len(objs_y))  # switch over second x value
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p, False)
+        conv.world.step()
+        q = conv.world.getState(WORLD, conv.get_feature_name(('q', objs_x[1])), unique=True)
+        self.assertEqual(q, objs_y[2])
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p, True)
+
+    def test_exists_and(self):
         objs = {'x1': 1, 'x2': 2, 'x3': 3, 'x4': 4}
         rddl = f'''
                 domain my_test {{
@@ -1162,7 +1423,7 @@ class TestAggregation(unittest.TestCase):
         p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, any(q > 3 and p_ for q in objs.values()))
 
-    def test_fluent_exists_or(self):
+    def test_exists_or(self):
         objs = {'x1': 1, 'x2': 2, 'x3': 3, 'x4': 4}
         rddl = f'''
                 domain my_test {{
@@ -1199,7 +1460,7 @@ class TestAggregation(unittest.TestCase):
         p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, any(q > 3 or p_ for q in objs.values()))
 
-    def test_fluent_exists_exists(self):
+    def test_exists_exists(self):
         objs = {('x1', 'y1'): 1,
                 ('x1', 'y2'): 2,
                 ('x2', 'y1'): 3,
@@ -1245,7 +1506,7 @@ class TestAggregation(unittest.TestCase):
                                     for y in set(y for _, y in objs.keys()))
                                 for x in set(x for x, _ in objs.keys())))
 
-    def test_fluent_exists_forall(self):
+    def test_exists_forall(self):
         objs = {('x1', 'y1'): 1,
                 ('x1', 'y2'): 2,
                 ('x2', 'y1'): 3,
@@ -1290,7 +1551,7 @@ class TestAggregation(unittest.TestCase):
                                     for y in set(y for _, y in objs.keys()))
                                 for x in set(x for x, _ in objs.keys())))
 
-    def test_fluent_exists_not_forall(self):
+    def test_exists_not_forall(self):
         objs = {('x1', 'y1'): 1,
                 ('x1', 'y2'): 2,
                 ('x2', 'y1'): 3,
@@ -1336,7 +1597,7 @@ class TestAggregation(unittest.TestCase):
                                         for y in set(y for _, y in objs.keys()))
                                 for x in set(x for x, _ in objs.keys())))
 
-    def test_invalid_fluent_exists_if(self):
+    def test_invalid_exists_if(self):
         objs = {'x1': 1, 'x2': 2, 'x3': 3, 'x4': 4}
         rddl = f'''
                 domain my_test {{
