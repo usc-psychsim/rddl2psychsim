@@ -230,8 +230,53 @@ class _DynamicsConverter(_ExpressionConverter):
 
         if 'logic_or' in branch:
             sub_exprs = branch['logic_or']
+
+            # check expression in the form [ (VAR == CONST1 ^ ...) | (VAR == CONST2 ^ ...) | ...]
+            # e.g., when we had a RDDL expression in the form exists_{?x : obj}[ VAR == ?x ^ ...]
+            conds = {}
+            str_to_conds = {}
+            cond_idxs = []
+            for i, sub_expr in enumerate(sub_exprs):
+                and_exprs = sub_expr['logic_and'] if 'logic_and' in sub_expr else [sub_expr]
+                for j, and_expr in enumerate(and_exprs):
+                    if 'eq' in and_expr:
+                        lhs = and_expr['eq'][0]
+                        rhs = and_expr['eq'][1]
+                        cond = None
+                        c_val = None
+                        if _is_linear_function(lhs):
+                            c_val = _get_const_val(rhs)
+                            if c_val is not None:
+                                cond = lhs
+                        elif _is_linear_function(rhs):
+                            c_val = _get_const_val(lhs)
+                            if c_val is not None:
+                                cond = rhs
+                        if cond is not None and c_val is not None:
+                            if str(cond) not in str_to_conds:
+                                str_to_conds[str(cond)] = cond
+                                conds[str(cond)] = []
+                            conds[str(cond)].append((c_val, and_exprs[:j] + and_exprs[j + 1:]))
+                            cond_idxs.append(i)
+
+            # transform sub expressions that have more than one possible value ofr a condition into a "switch"
+            sub_exprs = [sub_exprs[i] for i in range(len(sub_exprs)) if i not in cond_idxs]
+            for cond in conds.keys():
+                case_values = ['default']
+                case_exprs = [{CONSTANT: False}]
+                for c_val, and_exprs in conds[cond]:
+                    case_values.append({CONSTANT: c_val})
+                    case_exprs.append({'logic_and': and_exprs} if len(and_exprs) > 0 else {CONSTANT: True})
+                if len(case_values) > 2:
+                    sub_exprs.append({'switch': (str_to_conds[cond], case_values, case_exprs)})  # add switch
+                else:
+                    # if only one value to compare against, then revert to VAR == CONST formulation, ie no switch
+                    and_exprs = case_exprs[1]['logic_and'] if 'logic_and' in case_exprs[1] else []
+                    sub_exprs.append({'logic_and': [{'eq': (str_to_conds[cond], case_values[1])}, *and_exprs]})
+
             if len(sub_exprs) == 1:  # check OR of only one element
                 return self._get_if_tree(sub_exprs[0], true_child, false_child)
+
             # otherwise builds nested OR tree
             lhs = sub_exprs[0]
             rhs = {'logic_or': sub_exprs[1:]} if len(sub_exprs) > 2 else sub_exprs[1]
