@@ -229,21 +229,23 @@ class _DynamicsConverter(_ExpressionConverter):
                                      true_child)
 
         if 'logic_or' in branch:
-            sub_exprs = branch['logic_or']
+            or_exprs = branch['logic_or']
+            original_or_exprs = or_exprs.copy()
 
             # check expression in the form [ (VAR == CONST1 ^ ...) | (VAR == CONST2 ^ ...) | ...]
             # e.g., when we had a RDDL expression in the form exists_{?x : obj}[ VAR == ?x ^ ...]
-            conds = {}
+            cond_cases = {}
             str_to_conds = {}
-            cond_idxs = []
-            for i, sub_expr in enumerate(sub_exprs):
-                and_exprs = sub_expr['logic_and'] if 'logic_and' in sub_expr else [sub_expr]
+            cond_idxs = {}
+            for i, or_expr in enumerate(or_exprs):
+                and_exprs = or_expr['logic_and'] if 'logic_and' in or_expr else [or_expr]
                 for j, and_expr in enumerate(and_exprs):
                     if 'eq' in and_expr:
                         lhs = and_expr['eq'][0]
                         rhs = and_expr['eq'][1]
                         cond = None
                         c_val = None
+                        # test "LHS_expr == const" or "const == RHS_expr"
                         if _is_linear_function(lhs):
                             c_val = _get_const_val(rhs)
                             if c_val is not None:
@@ -253,33 +255,57 @@ class _DynamicsConverter(_ExpressionConverter):
                             if c_val is not None:
                                 cond = rhs
                         if cond is not None and c_val is not None:
+                            # if we found such an expression add to dict of form "const : case_exprs"
                             if str(cond) not in str_to_conds:
                                 str_to_conds[str(cond)] = cond
-                                conds[str(cond)] = []
-                            conds[str(cond)].append((c_val, and_exprs[:j] + and_exprs[j + 1:]))
-                            cond_idxs.append(i)
+                                cond_cases[str(cond)] = {}
+                                cond_idxs[str(cond)] = []
+                            if c_val not in cond_cases[str(cond)]:
+                                cond_cases[str(cond)][c_val] = []
+                            and_exprs_j = and_exprs[:j] + and_exprs[j + 1:]
+                            if and_exprs_j not in cond_cases[str(cond)][c_val]:
+                                cond_cases[str(cond)][c_val].append(and_exprs_j)
+                            cond_idxs[str(cond)].append(i)
 
-            # transform sub expressions that have more than one possible value ofr a condition into a "switch"
-            sub_exprs = [sub_exprs[i] for i in range(len(sub_exprs)) if i not in cond_idxs]
-            for cond in conds.keys():
+            # transform sub expressions that have more than one possible value for a condition into a "switch"
+            or_exprs = []
+            cond_keys = sorted(cond_cases.keys(),
+                               key=lambda cond: sum(len(and_exprs) for and_exprs in cond_cases[cond].values()),
+                               reverse=True)  # sort conditions by number of values (higher is better)
+            used_or_idxs = []  # to mark the indices from the original OR exprs already used for the switch statements
+            for cond in cond_keys:
+                if set(cond_idxs[cond]).intersection(used_or_idxs):
+                    continue
                 case_values = ['default']
                 case_exprs = [{CONSTANT: False}]
-                for c_val, and_exprs in conds[cond]:
+                for c_val, or_and_exprs in cond_cases[cond].items():
                     case_values.append({CONSTANT: c_val})
-                    case_exprs.append({'logic_and': and_exprs} if len(and_exprs) > 0 else {CONSTANT: True})
+                    case_or_exprs = []
+                    case_expr = {'logic_or': case_or_exprs}
+                    for and_exprs in or_and_exprs:
+                        if len(and_exprs) == 0:
+                            and_exprs = {CONSTANT: True}
+                        elif len(and_exprs) == 1:
+                            and_exprs = and_exprs[0]
+                        else:
+                            and_exprs = {'logic_and': and_exprs}
+                        if and_exprs not in case_or_exprs:
+                            case_or_exprs.append(and_exprs)
+                    if len(case_or_exprs) == 1:
+                        case_expr = case_or_exprs[0]
+                    case_exprs.append(case_expr)
                 if len(case_values) > 2:
-                    sub_exprs.append({'switch': (str_to_conds[cond], case_values, case_exprs)})  # add switch
-                else:
-                    # if only one value to compare against, then revert to VAR == CONST formulation, ie no switch
-                    and_exprs = case_exprs[1]['logic_and'] if 'logic_and' in case_exprs[1] else []
-                    sub_exprs.append({'logic_and': [{'eq': (str_to_conds[cond], case_values[1])}, *and_exprs]})
+                    or_exprs.append({'switch': (str_to_conds[cond], case_values, case_exprs)})  # add switch
+                    used_or_idxs.extend(cond_idxs[cond])
 
-            if len(sub_exprs) == 1:  # check OR of only one element
-                return self._get_if_tree(sub_exprs[0], true_child, false_child)
+            # append original OR sub-exprs that were not used in any switch transformation
+            or_exprs.extend([or_expr for i, or_expr in enumerate(original_or_exprs) if i not in used_or_idxs])
+            if len(or_exprs) == 1:  # check OR of only one element
+                return self._get_if_tree(or_exprs[0], true_child, false_child)
 
             # otherwise builds nested OR tree
-            lhs = sub_exprs[0]
-            rhs = {'logic_or': sub_exprs[1:]} if len(sub_exprs) > 2 else sub_exprs[1]
+            lhs = or_exprs[0]
+            rhs = {'logic_or': or_exprs[1:]} if len(or_exprs) > 2 else or_exprs[1]
             return self._get_if_tree(lhs,
                                      true_child,
                                      self._get_if_tree(rhs, true_child, false_child))
