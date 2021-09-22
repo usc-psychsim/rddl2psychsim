@@ -822,8 +822,8 @@ class TestBoolean(unittest.TestCase):
         conv = Converter()
         conv.convert_str(rddl)
         dyn = conv.world.getDynamics(stateKey(WORLD, 'p'), True)[0]
-        self.assertEqual(len(dyn.children[False].branch.planes), 1)  # p first, then switch, then r == 0 in OR tree
-        self.assertEqual(len(dyn.children[False].branch.planes[0][1]), 3)  # switch over all const values
+        self.assertEqual(len(dyn.branch.planes), 1)  # switch first, then p, then r == 0 in OR tree
+        self.assertEqual(len(dyn.branch.planes[0][1]), 3)  # switch over all const values
         p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, False)
         conv.world.step()

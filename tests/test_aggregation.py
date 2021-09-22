@@ -1309,6 +1309,57 @@ class TestAggregation(unittest.TestCase):
         p = conv.world.getState(WORLD, 'p', unique=True)
         self.assertEqual(p, r < 3)
 
+    def test_multi_exists_var_equals_and(self):
+        objs = ['x1', 'x2', 'x3', 'x4']
+        rddl = f'''
+                domain my_test {{
+                    types {{ obj : object; lvl_type : {{ @low, @medium, @high }}; }};
+                    pvariables {{ 
+                        p : {{ state-fluent, lvl_type, default = @low }};
+                        q : {{ state-fluent, obj, default = none }};
+                        t : {{ state-fluent, obj, default = none }};
+                        r : {{ state-fluent, int, default = 0 }};
+                        s : {{ state-fluent, bool, default = true }};
+                        a : {{ action-fluent, bool, default = false }}; 
+                    }};
+                    cpfs {{ 
+                        p' = if (s)
+                                then if (exists_{{?x : obj}}[ ?x == q ^ r > 0])
+                                    then @high
+                                else if (exists_{{?x : obj}}[ ?x == t ^ r == 0])
+                                    then @medium
+                                else @low
+                            else @low;
+                    }}; 
+                    reward = 0;
+                }}
+                non-fluents my_test_nf {{ 
+                    domain = my_test; 
+                    objects {{ obj : {{{', '.join(objs)}}}; }};
+                }}
+                instance my_test_inst {{ 
+                    domain = my_test; 
+                    init-state {{ q={objs[2]}; t={objs[3]}; }}; 
+                }}
+                '''
+        conv = Converter()
+        conv.convert_str(rddl)
+        dyn = conv.world.getDynamics(stateKey(WORLD, 'p'), True)[0]
+        self.assertEqual(len(dyn.children[True].branch.planes), 1)  # True if branch
+        self.assertEqual(len(dyn.children[True].branch.planes[0][1]), len(objs))  # switch with branch for each value
+        self.assertEqual(len(dyn.children[True].children[None].branch.planes), 1)  # False branch
+        self.assertEqual(len(dyn.children[True].children[None].branch.planes[0][1]), len(objs))  # switch over values
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p, 'low')
+        conv.world.step()
+        q = conv.world.getState(WORLD, 'q', unique=True)
+        self.assertEqual(q, objs[2])
+        t = conv.world.getState(WORLD, 't', unique=True)
+        self.assertEqual(t, objs[3])
+        r = conv.world.getState(WORLD, 'r', unique=True)
+        p = conv.world.getState(WORLD, 'p', unique=True)
+        self.assertEqual(p, 'high' if r > 0 else 'medium' if r == 0 else 'low')
+
     def test_exists_multi_param_var_equals(self):
         objs_x = ['x1', 'x2']
         objs_y = ['y1', 'y2', 'y3', 'y4']
