@@ -58,7 +58,7 @@ TODO
 - reals, converted to python floats
 - enumerated types via the `enum` definition in the `types` section. These correspond to domain-level constant types
   - <u>Note:</u> enums have no boolean or arithmetic evaluation, but can be used as constants in variable attribution and in relational expressions
-- object types, via the `object` declaration in the `types` section and further definition in the `non-fluents` section. These correspond to instance-lvel constant types. 
+- object types, via the `object` declaration in the `types` section and further definition in the `non-fluents` section. These correspond to instance-level constant types. 
   - <u>Note:</u> for conversion to PsychSim purposes, objects are treated just like an enumerated type
 
 ## Logical Expressions
