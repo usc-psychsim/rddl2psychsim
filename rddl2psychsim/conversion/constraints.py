@@ -63,17 +63,20 @@ class _ConstraintsConverter(_DynamicsConverter):
         const_val = _get_const_val(expr)
         if const_val is not None:
             if not bool(const_val):
-                err_msg = f'Constant state or action constraint "{constraint}" not satisfied!'
+                err_msg = f'Constant state or action constraint "{expression_to_rddl(constraint)}" not satisfied ' \
+                          f'for parameters: {param_map}!'
                 if self._const_as_assert:
                     raise AssertionError(err_msg)
                 logging.info(err_msg)
-            logging.info(f'State or action constraint "{constraint}" is always satisfied')
+            logging.info(f'State or action constraint "{expression_to_rddl(constraint)}" is always satisfied '
+                         f'for parameters: {param_map}')
             return
 
         # check for non-param action legality constraint in the form "action => constraint"
         legality_const = self._get_action_legality(expr)
         if legality_const is True:
-            logging.info(f'Action constraint "{constraint}" is always satisfied')
+            logging.info(f'Action constraint "{expression_to_rddl(constraint)}" is always satisfied '
+                         f'for parameters: {param_map}')
             return
         if legality_const is not None:
             agent, action, legal_tree = legality_const
