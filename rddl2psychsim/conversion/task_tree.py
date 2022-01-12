@@ -160,24 +160,52 @@ class TaskTree:
             s += str(self.nodes_dict[rt])
         return s
     
-    def get_blockers_of_node(self, node_name):
+    def get_blockers_of_node(self, node_name, level=0):
         node = self.nodes_dict[node_name]
         if node.value == True:
             return {}
         elif (node.value == False):
             if node.is_leaf():
-                return {node_name}
+                if node.type == ACTION:
+                    return {(level, node_name)}
+                else:
+                    return {}
             ## If I'm false, find out blockers of my children            
             blockers = set()
             for child in node.children:
-                blockers = blockers.union(self.get_blockers_of_node(child.name))            
+                blockers = blockers.union(self.get_blockers_of_node(child.name, level+1))            
             return blockers
         else:
             print('Value problem', node.value)
             return None
+        
+    
+    def get_blockers_of_node2(self, node_name, level=0, chain=[]):
+        node = self.nodes_dict[node_name]
+        if node.value == True:
+            return [chain]
+        
+        ## If I'm false, find out blockers of my children
+        elif (node.value == False):
+            new_chain = list(chain)
+            
+            ## If I'm an action, add me to chain
+#            if node.type == ACTION:
+            new_chain.append((level, node))
+
+            if node.is_leaf():
+                return [new_chain]
+                
+            blockers = []
+            for child in node.children:
+                blockers = blockers + self.get_blockers_of_node2(child.name, level+1, new_chain)
+            return blockers
+        else:
+            print('Value problem', node.value)
+            return [chain]
     
     def get_blockers(self):
-        blockers = {root:self.get_blockers_of_node(root) for root in self.roots}
+        blockers = {root:self.get_blockers_of_node2(root, level=0, chain=[]) for root in self.roots}
         return blockers
     
     def eval_from_world(self, world, actions):
@@ -204,6 +232,27 @@ def clean_strs(psim_strs, rmv):
         ret.append(cps)
     return ret
 
+def print_blockers():
+    pass
+
+def add_chain(chain, chains):
+    if chain in chains:
+        return False, chains
+    remove = []
+    for ch in chains:
+        if len(ch) > len(chain):
+            # if chain is a subset of an existing chain, we're done
+            if ch[:len(chain)] == chain:
+                return False, chains
+        else:
+            # if existing chain is subset of this chain, remove existing
+            if chain[:len(ch)] == ch:
+                remove.append(ch)
+                
+    new_chains = [ch for ch in chains if ch not in remove]
+    new_chains.append(chain)
+    return True, new_chains
+
 class AllTrees:
     def __init__(self, verbose=False):
         self.verbose = verbose
@@ -211,6 +260,50 @@ class AllTrees:
         self.legal_trees = dict()
         self.nodes_dict = {}
         self.edges = []
+        
+    def get_blockers(self, trees):
+        for tree in self.dyn_trees.keys():
+            blks = self.dyn_trees[tree].get_blockers()
+            blks = {k:v for k,v in blks.items() if 'saved' in k}
+            print('tttttt', tree)
+            for root, blks in blks.items():
+                print('rrrrrr', root)
+                seen_chains = []
+                for chain in blks:
+                    if len(chain) == 1:
+                        continue
+                    this_chain = [(n[0], n[1].name) for n in chain]
+                    chain_added, seen_chains = add_chain(this_chain, seen_chains)
+                    if not chain_added:
+                        continue
+                    print('ccccccc', this_chain)
+                    
+                    # Take the leaf of this chain and check if it appears as a parent in any tree
+                    leaf = chain[-1][1]
+                    print('ddddd', leaf.name)
+                    for t in self.dyn_trees.values():
+                        if t.id == tree:
+                            continue
+                        if leaf.name not in t.nodes_dict.keys():
+#                            print(leaf.name, 'not in', t.id)
+                            continue
+                        dangling = t.get_blockers_of_node2(leaf.name, level=chain[-1][0], chain=chain[:-1])
+                        print('>>', [[(n[0], n[1].name) for n in dchain] for dchain in dangling])
+            
+#            print(tree, blks)
+#            for root, blks in blks.items():
+#                for (lev, blk) in blks:
+#                    deep_blks = []
+#                    for t in self.dyn_trees.values():
+#                        if t.id == tree:
+#                            continue
+#                        if blk not in t.nodes_dict.keys():
+#                            continue
+#                        blk_node = t.nodes_dict[blk]
+#                        for ch in blk_node.children:
+#                            if ch.value == False:
+#                                deep_blks.append(t.get_blockers_of_node(ch.name))
+#                    print(blk, 'deep', deep_blks)
         
     def create_node(self, name, ntype, psim_name, value=None, player=None):
         if name in self.nodes_dict.keys():
@@ -221,7 +314,7 @@ class AllTrees:
         # Create a new tree
         new_tree = TaskTree(len(self.dyn_trees), self.verbose)            
         new_tree.add_edge_by_force(affected, affecting)
-        if self.verbose: print("New tree:", affected.name, affecting.name) 
+        if self.verbose: print("New tree:", affected.name, affecting.name, 'id', new_tree.id) 
         if is_legality_tree:
             self.legal_trees[affecting.name] = new_tree            
         else:
@@ -263,6 +356,45 @@ class AllTrees:
             affed_tree.add_edge(affected, affecting)
             
         self.edges.append((n_affected, n_affecting))
+        
+    
+    def attach_multi(self, n_affected, n_affecting):
+        if (n_affected, n_affecting) in self.edges:
+            print('Already added', n_affected, n_affecting)
+            return
+        affected = self.nodes_dict[n_affected]
+        affecting = self.nodes_dict[n_affecting]
+        affing_trees = []
+        affed_trees = []
+        for tree in self.dyn_trees.values():
+            if tree.contains(n_affected):
+                affed_trees.append(tree)
+            elif tree.contains(n_affecting):
+                affing_trees.append(tree)
+
+        if (affing_trees == []) and (affed_trees == []):
+            self.make_tree(affected, affecting)
+            
+        elif (len(affing_trees) > 0) and (len(affed_trees) > 0):
+            if self.verbose: print('Collapsing', affed_trees[0].id, 'subsumes', affing_trees[0].id)
+            affed_trees[0].subsume(affected, affecting, affing_trees[0])
+            del self.dyn_trees[affing_trees[0].id]
+            for t in affing_trees[1:]:
+                t.add_edge(affected, affecting)
+            for t in affed_trees[1:]:
+                t.add_edge(affected, affecting)
+            
+        elif len(affing_trees) > 0:
+            if self.verbose: print('Attaching to existing', n_affecting)
+            for t in affing_trees:
+                t.add_edge(affected, affecting)
+             
+        elif len(affed_trees) > 0:
+            if self.verbose: print('Attaching to existing', n_affected)
+            for t in affed_trees:
+                t.add_edge(affected, affecting)
+            
+        self.edges.append((n_affected, n_affecting))
                 
     def print(self):
         for i, tree in self.dyn_trees.items():
@@ -291,20 +423,22 @@ class AllTrees:
                     affecting_node = self.nodes_dict[affecting_name]
                     print('Legality:', a_name, 'affected by', affecting_name)
                     if new_tree is None:
-                        new_tree = self.make_tree(parent_node, affecting_node, is_legality_tree=True)
+                        new_tree = self.make_tree(parent_node, affecting_node) #, is_legality_tree=True
                     else:
                         new_tree.add_edge(parent_node , affecting_node )
                 
-                
+#                self.print()
                 ## Add an edge for the action-fluent dependency
                 for affected_psim_name in dyn_dict.keys():
                     affected_name = clean_str(affected_psim_name)
                     print('Dyn:', a_name, 'affects', affected_name )
                     self.attach(affected_name , a_name)
                     
+                self.print()
             ## If fluent dynamics 
             if type(key) == str:        
                 affected_name = clean_str(key)
+                print('Fluent:', affected_name, 'affected by', dyn_dict.keys())
                 for tkey in dyn_dict.keys():
                     affecting = clean_strs(dyn_dict[tkey].keys(), affected_name) 
                     for affing in affecting:  
@@ -313,6 +447,7 @@ class AllTrees:
                             print('hi')
                         self.attach(affected_name, affing)
                         
+                self.print()
     def eval_from_world(self, world):
         for tree in self.dyn_trees.values():
             tree.eval_from_world(world)
