@@ -14,6 +14,7 @@ PLAYERS = ['Eng', 'Med', 'Tran']
 from copy import deepcopy
 from psychsim.action import ActionSet
 from psychsim.probability import Distribution
+from psychsim.pwl.tree import KeyedTree
 
 def extract_from_actionset(actset):    
     a1lst = [a for a in actset][0]
@@ -23,13 +24,13 @@ def extract_from_actionset(actset):
     return player, a_name
 
 class TreeNode:
-    def __init__(self, name, ntype, npsim, nvalue=None, nplayer=None):
+    def __init__(self, name, ntype, npsim, nplayer=None):
         self.tree = None
         self.children = []
         self.parents = []
         self.name = name
         self.type = ntype
-        self.value = nvalue
+        self.value = None
         self.psim_name = npsim
         self.player = nplayer
         
@@ -253,6 +254,7 @@ class AllTrees:
         self.edges = []
         self.reward_trees = set()
         self.top_names = []
+        self.non_boolean_names = {}
         
     def add_toplevel_names(self, name):
         self.top_names.append(name)
@@ -302,14 +304,14 @@ class AllTrees:
                             if not d_chain_added:
                                 continue
                             print('\t\t\t>>>', chain_rep(d_chain))
-                            print('***** Collapse', tree, t.id)
+#                            print('***** Collapse', tree, t.id)
                 print('\tfffff', [chain_rep(c) for c in seen_chains])
             
         
-    def create_node(self, name, ntype, psim_name, value=None, player=None):
+    def create_node(self, name, ntype, psim_name, player=None):
         if name in self.nodes_dict.keys():
             return
-        self.nodes_dict[name] = TreeNode(name, ntype, psim_name, value, player)
+        self.nodes_dict[name] = TreeNode(name, ntype, psim_name, player)
         
     def make_tree(self, affected, affecting, is_legality_tree=False):
         # Create a new tree
@@ -391,21 +393,23 @@ class AllTrees:
             if self.verbose: print('Attaching to existing', n_affecting)
             for t in [self.dyn_trees[tr] for tr in affing_trees]:
                 t.add_edge(affected, affecting)
-            self.print()
+#            self.print()
              
         elif len(affed_trees) > 0:
             if self.verbose: print('Attaching to existing', n_affected)
             for t in [self.dyn_trees[tr] for tr in affed_trees]:
                 t.add_edge(affected, affecting)
-            self.print()
+#            self.print()
             
         self.edges.append((n_affected, n_affecting))
                 
-    def print(self):
-        for i, tree in self.dyn_trees.items():
-            print(i, tree)
-        for i, tree in self.legal_trees.items():
-            print(i, tree)
+    def print(self, reward_trees_only=False):
+        if reward_trees_only:
+            ids = self.reward_trees
+        else:
+            ids = self.dyn_trees.keys()
+        for i in ids:
+            print(i, self.dyn_trees[i])
 
     def final_stitch(self):
         ## Identify trees candidates for remove
@@ -417,48 +421,95 @@ class AllTrees:
                 if (cand_root in rew_tree.nodes_dict.keys()) and rew_tree.nodes_dict[cand_root].is_leaf():
                     rew_tree.subsume(cand.nodes_dict[cand_root], None, cand)
                     print('Attached', cand.id, 'to', rew_t)
+                    del self.dyn_trees[cand.id]
+                    
+    def get_node(self, nname):
+#        fluent_name = 
+        pass
             
+    def extract_tests(self, tree):
+        var_2_val = dict()
+        var_2_branches = dict()
+        bools = []
+        branch_plane = tree.branch
+        if branch_plane is None:
+            return var_2_val, bools
+        for kv, thresh, comp in branch_plane.planes:
+            if len(kv._data) > 1:
+                print('ERROR Dont know what to do', tree)
+                return None
+            pvar = list(kv._data.keys())[0]
+            is_non_bool = pvar in self.non_boolean_names.values()
+            if is_non_bool:
+                if comp == 0:
+                    var_2_val[pvar] = thresh
+                else:
+                    if pvar not in var_2_branches:
+                        var_2_branches[pvar] = []
+                    var_2_branches[pvar].append((thresh, comp))
+            else:
+                bools.append(pvar)
+        
+        ## For non-booleans that have multipleb branches
+        for nonb, branches in var_2_branches.items():
+            if len(branches) != 2:
+                print('ERROR Dont know what to do', tree)
+                return None
+            ## If same threshold and opposite comparisons
+            threshs = set([branches[0][0], branches[1][0]])
+            comps =   set([branches[0][1], branches[1][1]])
+            if (len(threshs) == 1) and (len(comps) == 2):
+                var_2_val[nonb] = threshs.pop() 
+            
+        return var_2_val, bools
+    
     def build(self, dynamics, legality):        
         for key, dyn_dict in dynamics.items():
-            ## If action dynamics 
+            ## Action dynamics 
             if type(key) == ActionSet:
                 player, a_name = extract_from_actionset(key)
                 
                 ## Add the action node
-                self.create_node(a_name, ACTION, a_name, None, player)
-                
-                ## Get the legality tree for this agent for this action
-                legality_tree = legality[player].get(key, dict())                
-                ## Get the fluents in the tree. These affect the action
+                self.create_node(a_name, ACTION, a_name, player)
+                                
+                ## Dynamics tree
+                ## Fluents in this tree are affected by the action
+                for affected_psim_name in dyn_dict.keys():
+                    affected_name = clean_str(affected_psim_name)
+                    print('Dyn:', a_name, 'affects', affected_name )
+                    self.attach_multi(affected_name , a_name)
+                    
+                ## Legality tree
+                ## Fluents in this tree affect the action
+                legality_tree = legality[player].get(key, dict())
+                if type(legality_tree) != dict:
+                    var_2_val, bools = self.extract_tests(legality_tree)
+                    print(var_2_val, bools, legality_tree)
                 affecting_fluents = list(legality_tree.keys())
                 new_tree = None
                 parent_node = self.nodes_dict[a_name]
                 for affecting_psim_name in affecting_fluents:
                     affecting_name = clean_str(affecting_psim_name)
+                    if affecting_name not in self.nodes_dict:
+                        print('hi')
                     affecting_node = self.nodes_dict[affecting_name]
                     print('Legality:', a_name, 'affected by', affecting_name)
                     if new_tree is None:
                         new_tree = self.make_tree(parent_node, affecting_node) #, is_legality_tree=True
                     else:
                         new_tree.add_edge(parent_node , affecting_node )
-                
-#                self.print()
-                ## Add an edge for the action-fluent dependency
-                for affected_psim_name in dyn_dict.keys():
-                    affected_name = clean_str(affected_psim_name)
-                    print('Dyn:', a_name, 'affects', affected_name )
-                    self.attach_multi(affected_name , a_name)
-                    if 'move' in a_name:
-                        print('hi')
                     
-            ## If fluent dynamics 
+            ## Fluent dynamics 
             if type(key) == str:        
                 affected_name = clean_str(key)
-                print('Fluent:', affected_name, 'affected by', dyn_dict.keys())
-                for tkey in dyn_dict.keys():
-                    affecting = clean_strs(dyn_dict[tkey].keys(), affected_name) 
+                print('Fluent:', affected_name, 'affected by list', dyn_dict.keys())
+                if 'triaged' in affected_name:
+                    print('hi')
+                for action_or_true, dtree in dyn_dict.items():
+                    # Ignore action_or_true because the action dependency was captured above
+                    affecting = clean_strs(dtree.keys(), affected_name) 
                     for affing in affecting:  
-                        print('Fluent:', affected_name, 'affected by', affing)
+                        print('\taffected by', affing)
                         if 'ACTION' in affing:
                             print('hi')
                         self.attach_multi(affected_name, affing)                    
