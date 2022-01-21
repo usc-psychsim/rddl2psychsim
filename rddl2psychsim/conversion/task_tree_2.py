@@ -31,8 +31,14 @@ class TreeNode:
         self.name = name
         self.type = ntype
         self.value = None
+        self.equality_test_value = None
         self.psim_name = npsim
         self.player = nplayer
+        
+    def true(self):
+        if self.equality_test_value is None:
+            return self.value
+        return self.equality_test_value == self.value
         
     def is_root(self):
         return len(self.parents) == 0
@@ -55,7 +61,7 @@ class TreeNode:
         self.children.append(ch.name)
     
     def __str__(self, level=0):
-        ret = '\n' + "\t"*level + self.psim_name 
+        ret = '\n' + "\t"*level + self.name 
         if self.value is not None:
             if type(self.value) == Distribution:
                 self.value = self.value.first()
@@ -154,9 +160,9 @@ class TaskTree:
     
     def get_blockers_of_node(self, node_name, level=0):
         node = self.nodes_dict[node_name]
-        if node.value == True:
+        if node.true():
             return {}
-        elif (node.value == False):
+        else:
             if node.is_leaf():
                 if node.type == ACTION:
                     return {(level, node_name)}
@@ -167,31 +173,24 @@ class TaskTree:
             for child in node.children:
                 blockers = blockers.union(self.get_blockers_of_node(child.name, level+1))            
             return blockers
-        else:
-            print('Value problem', node.value)
-            return None
         
     
     def get_blockers_of_node2(self, node_name, level=0, chain=[]):
         node = self.nodes_dict[node_name]
-        if node.value == True:
+        if node.true():
             return [chain]
         
         ## If I'm false, find out blockers of my children
-        elif (node.value == False):
-            new_chain = list(chain)            
-            new_chain.append((level, node))
+        new_chain = list(chain)            
+        new_chain.append((level, node))
 
-            if node.is_leaf():
-                return [new_chain]
-                
-            blockers = []
-            for child in node.children:
-                blockers = blockers + self.get_blockers_of_node2(child, level+1, new_chain)
-            return blockers
-        else:
-            print('Value problem', node.value)
-            return [chain]
+        if node.is_leaf():
+            return [new_chain]
+            
+        blockers = []
+        for child in node.children:
+            blockers = blockers + self.get_blockers_of_node2(child, level+1, new_chain)
+        return blockers
     
     def get_blockers(self):
         blockers = {root:self.get_blockers_of_node2(root, level=0, chain=[]) for root in self.roots}
@@ -250,11 +249,12 @@ class AllTrees:
         self.verbose = verbose
         self.dyn_trees = dict()
         self.legal_trees = dict()   # unused for now
-        self.nodes_dict = {}
+        self.nodes_dict = dict()
         self.edges = []
         self.reward_trees = set()
         self.top_names = []
-        self.non_boolean_names = {}
+        self.non_boolean_names = dict()
+        self.non_boolean_2_affecting = dict()
         
     def add_toplevel_names(self, name):
         self.top_names.append(name)
@@ -423,9 +423,26 @@ class AllTrees:
                     print('Attached', cand.id, 'to', rew_t)
                     del self.dyn_trees[cand.id]
                     
-    def get_node(self, nname):
-#        fluent_name = 
-        pass
+    def get_node(self, nname, nval=None):
+        if nname in self.nodes_dict:
+            return [self.nodes_dict[nname]]
+
+        # If nname not in my dict and no value is provided, find all matching nodes
+        if nval is None:
+            all_matches = [node for nm, node in self.nodes_dict.items() if nm.startswith(nname)]
+            return all_matches
+        ## Create of look up the node for this non-boolean variable that corresponds to the given value
+        psim_name = nname
+        nname += '==' + str(nval)
+        # Create or look up
+        self.create_node(nname, PROP, psim_name)
+        self.nodes_dict[nname].equality_test_value = nval
+        # Check if there are dependencies that should be added
+        if psim_name in self.non_boolean_2_affecting:
+            print('jjjjjjjjjjjjjjjjjj', nname, self.non_boolean_2_affecting[psim_name])
+            for aname in self.non_boolean_2_affecting[psim_name]:
+                self.attach_multi(nname, aname)
+        return [self.nodes_dict[nname]]
             
     def extract_tests(self, tree):
         var_2_val = dict()
@@ -435,20 +452,17 @@ class AllTrees:
         if branch_plane is None:
             return var_2_val, bools
         for kv, thresh, comp in branch_plane.planes:
-            if len(kv._data) > 1:
-                print('ERROR Dont know what to do', tree)
-                return None
-            pvar = list(kv._data.keys())[0]
-            is_non_bool = pvar in self.non_boolean_names.values()
-            if is_non_bool:
-                if comp == 0:
-                    var_2_val[pvar] = thresh
+            for pvar in kv._data.keys():
+                is_non_bool = pvar in self.non_boolean_names.values()
+                if is_non_bool:
+                    if comp == 0:
+                        var_2_val[pvar] = thresh
+                    else:
+                        if pvar not in var_2_branches:
+                            var_2_branches[pvar] = []
+                        var_2_branches[pvar].append((thresh, comp))
                 else:
-                    if pvar not in var_2_branches:
-                        var_2_branches[pvar] = []
-                    var_2_branches[pvar].append((thresh, comp))
-            else:
-                bools.append(pvar)
+                    bools.append(pvar)
         
         ## For non-booleans that have multipleb branches
         for nonb, branches in var_2_branches.items():
@@ -463,6 +477,7 @@ class AllTrees:
             
         return var_2_val, bools
     
+   
     def build(self, dynamics, legality):        
         for key, dyn_dict in dynamics.items():
             ## Action dynamics 
@@ -476,43 +491,91 @@ class AllTrees:
                 ## Fluents in this tree are affected by the action
                 for affected_psim_name in dyn_dict.keys():
                     affected_name = clean_str(affected_psim_name)
-                    print('Dyn:', a_name, 'affects', affected_name )
-                    self.attach_multi(affected_name , a_name)
+                    self.store_dep(affected_name, a_name)
+                    affected_nodes = self.get_node(affected_name)
+                    for affected_node in affected_nodes:
+                        print('Dyn:', a_name, 'affects', affected_node.name)
+                        self.attach_multi(affected_node.name, a_name)
                     
                 ## Legality tree
                 ## Fluents in this tree affect the action
-                legality_tree = legality[player].get(key, dict())
-                if type(legality_tree) != dict:
-                    var_2_val, bools = self.extract_tests(legality_tree)
-                    print(var_2_val, bools, legality_tree)
-                affecting_fluents = list(legality_tree.keys())
                 new_tree = None
                 parent_node = self.nodes_dict[a_name]
-                for affecting_psim_name in affecting_fluents:
-                    affecting_name = clean_str(affecting_psim_name)
-                    if affecting_name not in self.nodes_dict:
-                        print('hi')
-                    affecting_node = self.nodes_dict[affecting_name]
-                    print('Legality:', a_name, 'affected by', affecting_name)
-                    if new_tree is None:
-                        new_tree = self.make_tree(parent_node, affecting_node) #, is_legality_tree=True
+                legality_tree = legality[player].get(key, dict())
+                if type(legality_tree) == dict:
+                    if len(legality_tree) == 0:
+                        pass
                     else:
-                        new_tree.add_edge(parent_node , affecting_node )
-                    
+                        print('ERROR dict legality', legality_tree)    
+                else:
+                    var_2_val, bools = self.extract_tests(legality_tree)
+                    print('Legality:', a_name, var_2_val, bools)
+
+                    for boolvar in bools:
+                        if boolvar == a_name:
+                            continue
+                        affecting_name = clean_str(boolvar)
+                        affecting_node = self.nodes_dict[affecting_name]
+                        print('\taffected by', affecting_name)
+                        if new_tree is None:
+                            new_tree = self.make_tree(parent_node, affecting_node) #, is_legality_tree=True
+                        else:
+                            new_tree.add_edge(parent_node , affecting_node )
+
+                    for affecting_psim_name,val in var_2_val.items():
+                        affecting_name = clean_str(affecting_psim_name)
+                        if affecting_name == a_name:
+                            continue
+                        # Because this is an affecting node, even if it's non-boolean, there's a single
+                        # value that produces the effect, so the call will return a list of 1 element
+                        affecting_node = self.get_node(affecting_name, val)[0]
+                        print('\taffected by', affecting_name, val)
+                        if new_tree is None:
+                            new_tree = self.make_tree(parent_node, affecting_node) #, is_legality_tree=True
+                        else:
+                            new_tree.add_edge(parent_node , affecting_node )
+                    if new_tree is not None:
+                        print(new_tree.id, new_tree)
+                        
             ## Fluent dynamics 
             if type(key) == str:        
                 affected_name = clean_str(key)
-                print('Fluent:', affected_name, 'affected by list', dyn_dict.keys())
-                if 'triaged' in affected_name:
-                    print('hi')
                 for action_or_true, dtree in dyn_dict.items():
                     # Ignore action_or_true because the action dependency was captured above
-                    affecting = clean_strs(dtree.keys(), affected_name) 
-                    for affing in affecting:  
-                        print('\taffected by', affing)
-                        if 'ACTION' in affing:
-                            print('hi')
-                        self.attach_multi(affected_name, affing)                    
+                    if type(dtree) == dict:
+                        if len(dtree) == 0:
+                            pass
+                        else:
+                            print('ERROR dict fluent dyn', dtree)    
+                    else:
+                        var_2_val, bools = self.extract_tests(dtree)
+                        print('Fluent:', affected_name, var_2_val, bools)
+                        
+                        for boolvar in bools:
+                            affecting_name = clean_str(boolvar)
+                            if affecting_name == affected_name:
+                                continue
+                            print('\taffected by', affecting_name)
+                            self.attach_multi(affected_name, affecting_name)
+                            self.store_dep(affected_name, affecting_name)
+    
+                        for affecting_psim_name,val in var_2_val.items():
+                            affecting_name = clean_str(affecting_psim_name)
+                            if affecting_name == affected_name:
+                                continue
+                            # Because this is an affecting node, even if it's non-boolean, there's a single
+                            # value that produces the effect, so the call will return a list of 1 element
+                            affecting_node = self.get_node(affecting_name, val)[0]
+                            print('\taffected by', affecting_name, val)
+                            self.attach_multi(affected_name, affecting_node.name)
+                            self.store_dep(affected_name, affecting_node.name)
+                    
+    def store_dep(self, affected_name, affecting_name):        
+        if affected_name in self.non_boolean_names.values():
+            if affected_name not in self.non_boolean_2_affecting:
+                self.non_boolean_2_affecting[affected_name] = []
+            self.non_boolean_2_affecting[affected_name].append(affecting_name)    
+            
         
 if __name__ == "__main__":
     at = AllTrees(True)
