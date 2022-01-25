@@ -120,7 +120,7 @@ class _DynamicsConverter(_ExpressionConverter):
                 return dynamics
 
             # if only one action in conjunction, remove it from conjunction and set its dynamics
-            and_expr = tuple(sub_expr for i, sub_expr in enumerate(sub_exprs) if i != action_idx)
+            and_expr = list(sub_expr for i, sub_expr in enumerate(sub_exprs) if i != action_idx)
             dynamics = self._extract_action_dynamics(expression[False])
             return {action: {'if': {'logic_and': and_expr}, True: expression[True], False: dynamics[True]},
                     **dynamics}
@@ -144,7 +144,7 @@ class _DynamicsConverter(_ExpressionConverter):
                 return dynamics
 
             # set True branch dynamics to actions, remove them from disjunction and set dynamics to world
-            or_expr = tuple(sub_expr for i, sub_expr in enumerate(sub_exprs) if i not in idxs)
+            or_expr = list(sub_expr for i, sub_expr in enumerate(sub_exprs) if i not in idxs)
             dynamics = {}
             for dyn in action_dynamics:
                 dynamics.update(dyn)  # add action-conditioned dynamics
