@@ -117,13 +117,13 @@ def _propagate_switch_expr(op: str, *args: Dict[str, Any]) -> Dict:
         else:
             new_args.append(arg)
     if switch_arg is None:
-        return {op: tuple(args)}
+        return {op: list(args)}
     switch_arg, case_values, case_children = switch_arg['switch']
     new_case_children = []
     for case_child in case_children:  # case child used as branch for the if subtree
         op_args = new_args.copy()
         op_args[switch_idx] = case_child
-        new_case_children.append({op: tuple(op_args) if len(op_args) > 1 else op_args[0]})
+        new_case_children.append({op: list(op_args) if len(op_args) > 1 else op_args[0]})
     return {'switch': (switch_arg, case_values, new_case_children)}
 
 
